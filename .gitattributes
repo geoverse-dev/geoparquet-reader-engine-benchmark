@@ -1,0 +1,2 @@
+# Workload CSVs are data fixtures; preserve their original line endings.
+config/*.csv text eol=lf

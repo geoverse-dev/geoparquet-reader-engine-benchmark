@@ -1,0 +1,84 @@
+name: Benchmark checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: 'Concurrent scenario'
+        type: choice
+        options: [warm, mixed, cold, all]
+        default: all
+      runs:
+        description: 'Independent runs per scenario'
+        default: '3'
+      levels:
+        description: 'Optional override, e.g. 1 2 4 8'
+        default: ''
+      queries:
+        description: 'Optional query count override'
+        default: ''
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell syntax
+        run: |
+          find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Python syntax
+        run: python3 -m compileall -q python scripts
+      - name: Check scenario wrappers
+        run: |
+          python3 - <<'PYTEST'
+          from pathlib import Path
+          for name in ('warm','mixed','cold'):
+              assert Path(f'scripts/bench-concurrent-{name}.sh').exists()
+          PYTEST
+
+  remote-benchmark:
+    if: github.event_name == 'workflow_dispatch'
+    needs: static-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ vars.R2_BUCKET }}
+      R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+      R2_REGION: ${{ vars.R2_REGION }}
+      RUNS: ${{ inputs.runs }}
+      LEVELS: ${{ inputs.levels }}
+      QUERIES: ${{ inputs.queries }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: astral-sh/setup-uv@v6
+      - name: Verify credentials
+        run: |
+          test -n "$AWS_ACCESS_KEY_ID" && test -n "$AWS_SECRET_ACCESS_KEY" || { echo 'Configure R2_ACCESS_KEY_ID and R2_SECRET_ACCESS_KEY secrets'; exit 1; }
+      - name: Setup
+        run: make setup
+      - name: Smoke test
+        run: make smoke
+      - name: Concurrent scenarios
+        run: |
+          unset_levels="${LEVELS:-}"
+          unset_queries="${QUERIES:-}"
+          for scenario in warm mixed cold; do
+            if [[ "${{ inputs.scenario }}" != all && "${{ inputs.scenario }}" != "$scenario" ]]; then continue; fi
+            if [[ -n "$unset_levels" ]]; then export LEVELS="$unset_levels"; else unset LEVELS; fi
+            if [[ -n "$unset_queries" ]]; then export QUERIES="$unset_queries"; else unset QUERIES; fi
+            bash "scripts/bench-concurrent-$scenario.sh"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: benchmark-results
+          path: results/
+          if-no-files-found: warn
