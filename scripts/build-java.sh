@@ -29,3 +29,9 @@ fi
 	mvn -q -Dmaven.test.skip=true package dependency:build-classpath \
 		-Dmdep.outputFile=target/classpath.txt
 )
+
+(
+	cd java-parquet
+	mvn -q -Dmaven.test.skip=true package dependency:build-classpath \
+		-Dmdep.outputFile=target/classpath.txt
+)

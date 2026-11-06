@@ -1,14 +1,14 @@
-# Remote GeoParquet Reader Benchmark: DuckDB vs Parquetry
+# Remote GeoParquet Reader Benchmark: DuckDB vs Parquetry vs parquet-java
 
 [Leer en español](README.es.md)
 
-A reproducible benchmark harness comparing **DuckDB/httpfs** and **Parquetry + Tileverse Storage** reading remote GeoParquet over S3-compatible object storage (Cloudflare R2 in the original experiments). The repository evaluates the **underlying readers**, not GeoServer WMS/WFS or DataStore implementations. It does **not** include the separate Portolan CLI experiments.
+A reproducible benchmark harness comparing **DuckDB/httpfs**, **Parquetry**, and **Apache parquet-java**, reading remote GeoParquet over S3-compatible object storage (Cloudflare R2 in the original experiments). Parquetry uses Tileverse Storage; parquet-java uses its conventional Hadoop S3A backend and defaults. No benchmark arm downloads the whole object locally. The repository evaluates the **underlying readers**, not GeoServer WMS/WFS or DataStore implementations.
 
-The original study uses Overture Maps **Argentina buildings** (~26.77 million records) in three layouts: `raw`, Hilbert/ZSTD GeoParquet 1.1, and Hilbert/ZSTD GeoParquet 2.0. The principal benchmark uses **150 BBOX queries** and compares DuckDB's default reader configuration with Parquetry using Tileverse `CachingRangeReader` by default. It measures latency, row counts, percentiles, and Parquetry delegate range reads; diagnostic runs examine first-read I/O, cache reuse, geographic jumps, and process memory.
+The original study uses Overture Maps **Argentina buildings** (~26.77 million records) in three layouts: `raw`, Hilbert/ZSTD GeoParquet 1.1, and Hilbert/ZSTD GeoParquet 2.0. The principal benchmark uses **150 BBOX queries** and compares DuckDB/httpfs defaults, Parquetry with Tileverse `CachingRangeReader`, and parquet-java with Hadoop S3A defaults. It measures latency, row counts, percentiles, and the range metrics each backend exposes; diagnostic runs examine first-read I/O, cache reuse, geographic jumps, and process memory.
 
 ## Requirements
 
-Linux or macOS shell, `git`, `curl`, `make`, **Java 25** (including preview features), Maven, Python 3.11+, and [uv](https://docs.astral.sh/uv/). AWS CLI is optional if you supply R2 credentials through environment variables. Downloading datasets locally requires ~7 GiB free; **remote benchmarks do not require local data**. A working network connection is required for dependencies and Cloudflare R2.
+Linux or macOS shell, `git`, `curl`, `make`, **Java 25** (including preview features) for Parquetry, a **Java 17 runtime** for parquet-java/Hadoop S3A, Maven, Python 3.11+, and [uv](https://docs.astral.sh/uv/). Set `JAVA17_HOME` or `PARQUET_JAVA_BIN` if Java 17 is not installed at the common Linux path. The separate runtime is required because current Hadoop S3A is incompatible with Java 25; it does not change the workload. AWS CLI is optional if you supply R2 credentials through environment variables.
 
 **Parquetry is a source dependency** (snapshot artifacts). `make setup` clones `https://github.com/tileverse-io/parquetry` into `vendor/parquetry`, fetches the remote, and builds the latest commit from `origin/main` by default. This repository deliberately does not contain the upstream library or precompiled JARs. For a reproducible run, pin a branch, tag, or commit with `PARQUETRY_REF`, for example `PARQUETRY_REF=876687bc865fb3fc0526bd3c7d69d030db6a7d44 make setup`. The exact resolved commit is printed by setup and should be recorded with published results.
 
@@ -49,8 +49,8 @@ These URLs are recorded from the original experiments, **not revalidated here**.
 | `make check` | Check tools and local files | Console |
 | `make setup` | `uv sync`, clone/build Parquetry, build benchmark | Maven artifacts |
 | `make build` | Rebuild Java benchmark and upstream snapshot | `java/target/` |
-| `make smoke` | First BBOX, 0 warmups, both readers, all 3 layouts | `results/smoke-*.csv` |
-| `make bench` | DuckDB default vs. cached Parquetry, 150 BBOX per layout | `results/r2-comparable-*.csv` |
+| `make smoke` | First BBOX, 0 warmups, all 3 readers and layouts | `results/smoke-*.csv` |
+| `make bench` | DuckDB/httpfs, cached Parquetry, and parquet-java/S3A defaults; 150 BBOX per layout | `results/r2-comparable-*.csv` |
 | `PARQUETRY_CACHE=off make bench` | Uncached Parquetry diagnostic | `results/r2-comparable-nocache-*.csv` |
 | `make report` | Regenerate summary from benchmark runs | `results/r2-comparable-summary.csv` |
 | `make io-diagnostics` | First-query HTTP/filesystem vs logical range reads | Console |
@@ -58,6 +58,7 @@ These URLs are recorded from the original experiments, **not revalidated here**.
 | `make geographic-jumps` | Tandil → BA → Córdoba → Mendoza → Bariloche → Salta → Tandil | CSVs |
 | `make cache` | Parquetry with/without Tileverse caching over repeated regions | CSV |
 | `make memory` | RSS/heap/cache metrics during geographic jumps | CSVs |
+| `make benchmark-suite` | Full sequential, geographic, memory, and concurrent comparison for all 3 readers | `results/` |
 | `make data` | Download all three public GeoParquet files | `data/` |
 | `make optimize` | Recreate optimized layouts from `data/raw/raw.parquet` | `data/optimized/` |
 | `make all` | Main comparison + cache + geography + memory | `results/` |
@@ -76,17 +77,17 @@ WARMUPS=2 LIMIT=0 make bench
 
 `LIMIT=0` means all 150 rows. `WARMUPS` repeats the full workload before the measured pass. These tests use a **persistent reader process per engine/layout**; they are not cold-process CLI benchmarks. First-read diagnostics are separate.
 
-`PARQUETRY_CACHE=on` is the default. One Tileverse `CachingRangeReader` and one `ParquetSource` are created per layout and reused for all warmup and measured queries. `PARQUETRY_CACHE=off` bypasses that wrapper and writes separate diagnostic files by default, so it cannot silently replace the primary cached results. Invalid values fail immediately. DuckDB keeps its existing `httpfs` defaults; the benchmark does not modify its cache settings.
+`PARQUETRY_CACHE=on` is the default for Parquetry. One Tileverse `CachingRangeReader` and one `ParquetSource` are reused per layout. parquet-java constructs a `ParquetReader` per filtered query over a persistent Hadoop S3A filesystem and leaves S3A buffering, readahead, and connection behavior at their native defaults. `PARQUETRY_CACHE=off` only changes Parquetry and writes separate diagnostic files. DuckDB keeps its existing `httpfs` defaults.
 
 With `WARMUPS=0`, the measured pass is labeled `first_access_session`, but this does not guarantee empty OS, network, CDN, or other shared caches. With one or more warmups, it is labeled `persistent_warm_session`.
 
 ### Outputs and interpretation
 
-`results/r2-comparable-runs.csv` records the reader configuration, benchmark/cache mode, lifecycle, warmup count, query rows and latency. Parquetry rows also record calls and bytes that reach the physical reader **below** the optional cache. These are delegate range operations, not verified HTTP request counts. The summary groups query names by small/medium/large, reports median/mean/p95/p99, and validates DuckDB and Parquetry row counts per query. Mismatches are warned and labeled rather than hidden. Legacy CSVs without cache metadata are marked `legacy_unspecified` and cannot support cache-aligned claims.
+`results/r2-comparable-runs.csv` records the reader configuration, benchmark/cache mode, lifecycle, warmup count, query rows and latency. Parquetry rows also record delegate range calls and bytes. parquet-java leaves those fields empty because Hadoop S3A does not expose equivalent per-query counters through parquet-java. The summary groups query names by size, reports median/mean/p95/p99, and validates every non-DuckDB reader against DuckDB per query.
 
-The headline result is a comparison of complete system configurations—DuckDB defaults versus Parquetry with Tileverse cache—not an isolated comparison of decoding engines or identical cache implementations. Archived original results are in `results/reference/` and are **not** regenerated by `make report` until you run the benchmark.
+The headline result is a comparison of complete, conventional configurations—DuckDB/httpfs defaults, Parquetry with Tileverse cache, and parquet-java with Hadoop S3A defaults—not an isolated comparison of decoding engines or caches.
 
-**Important:** The DuckDB predicate uses stored `bbox` field comparisons, while Parquetry uses `geometry.bboxIntersects`; results differ by a few boundary features. Some diagnostic I/O counters are not directly comparable: DuckDB logs physical HTTP/filesystem operations, whereas Parquetry's range counter can represent logical calls. Do not treat these as identical predicates or identical request instrumentation.
+**Important:** DuckDB and parquet-java use the same stored `bbox` comparisons. Parquetry uses `geometry.bboxIntersects`, so its result can differ by a few boundary features. parquet-java pushes the numeric BBOX predicate through `FilterCompat`, projects `id`, `geometry`, and `bbox`, and counts materialized records. I/O counters across the three native backends are not treated as equivalent.
 
 See [Methodology](docs/METHODOLOGY.md) and [Data and credentials](docs/DATA.md).
 
@@ -95,13 +96,13 @@ See [Methodology](docs/METHODOLOGY.md) and [Data and credentials](docs/DATA.md).
 - No end-to-end GeoServer benchmarking; results measure reader libraries.
 - Results depend on R2 region, network, dependency versions, caches, JVM/Python configuration and workload ordering.
 - First-query cost and steady-state performance must be reported separately.
-- GeoParquet-IO is used to **prepare** optimized datasets; the remote engine comparison is **DuckDB vs Parquetry**.
-- Java 25 + preview is required by the benchmark source at the time of these tests.
+- GeoParquet-IO is used to **prepare** optimized datasets; the sequential remote comparison covers **DuckDB, Parquetry, and parquet-java**.
+- Java 25 + preview is required for Parquetry; parquet-java/S3A runs separately on Java 17.
 - Run `make smoke` on your machine before publishing new measurements. Java 25 and access to the configured S3-compatible bucket are required.
 
 ## Concurrent requests (experimental)
 
-`make bench-concurrent` runs **one persistent reader per engine**, sharing the DuckDB database across worker cursors and a Parquetry `ParquetSource` across threads. It reports throughput (QPS), p50/p95/p99 query latency, peak process RSS on Linux, and total row counts. Concurrency is measured separately from the original sequential study. The Parquetry concurrent runner uses a shared **Tileverse `CachingRangeReader`**; cache settings are part of the measured configuration.
+`make bench-concurrent` runs all three readers: DuckDB shares its database across worker cursors, Parquetry shares a `ParquetSource`, and parquet-java creates independent `ParquetReader` instances over the same persistent Hadoop S3A filesystem. It reports throughput (QPS), p50/p95/p99 query latency, peak process RSS on Linux, and total row counts. Workloads, scenarios, warmups, concurrency levels, and metrics are unchanged across readers.
 
 ```bash
 # Requires the same S3 credentials and `make setup` as the main benchmark
@@ -132,7 +133,7 @@ make bench-concurrent-report
 | `mixed` | 1, 2, 4, 8, 16 | 150 | Entire workload, first six windows warmed |
 | `cold` | 1, 2, 4, 8 | 40 | No explicit warmup (not guaranteed cold network/cache) |
 
-Overrides: `RUNS=5`, `LEVELS="1 2 4"`, `QUERIES=100`, `REPORT_DIR=results/custom`, and `OBJECT=raw.parquet`. Each run launches fresh processes for each engine and worker level. Existing run CSVs for the selected scenario are replaced, preventing stale data from affecting summaries.
+Overrides: `RUNS=5`, `LEVELS="1 2 4"`, `QUERIES=100`, `REPORT_DIR=results/custom`, and `OBJECT=raw.parquet`. Each run launches fresh processes for each of the three readers and worker level. Existing run CSVs for the selected scenario are replaced, preventing stale data from affecting summaries.
 
 Outputs are in `results/report-concurrency/`: `<scenario>-run-<N>.csv` and `<scenario>-summary.csv`. `make bench-concurrent-report` also creates `results/geoparquet-concurrency-report-data.tar.gz`. The summary reports the median of the per-run metrics (including each run's p95/p99), not percentiles pooled over all requests.
 

@@ -10,10 +10,14 @@ WORKLOAD="${WORKLOAD:-config/workload-geographic-jumps.csv}"
 mkdir -p results
 DOUT=results/r2-geographic-jumps-duckdb.csv
 POUT=results/r2-geographic-jumps-parquetry.csv
+JOUT=results/r2-geographic-jumps-parquet-java.csv
 echo "layout,position,query,rows,elapsed_ms,http_requests,http_gets,http_heads,fs_read_ops,fs_bytes" >"$DOUT"
 echo "layout,position,query,rows,elapsed_ms,range_calls,range_bytes_requested,range_bytes_returned" >"$POUT"
+echo "layout,position,query,rows,elapsed_ms" >"$JOUT"
 (cd java && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
+(cd java-parquet && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
 CP="java/target/classes:$(cat java/target/classpath.txt)"
+PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
 run_one() {
 	local layout="$1" object="$2" tmp
 	echo "=== $layout / duckdb ==="
@@ -26,6 +30,11 @@ run_one() {
 	java --enable-preview -cp "$CP" io.geoverse.bench.ParquetryR2GeographicJumpBench "$BUCKET" "$object" "$WORKLOAD" "$ENDPOINT" "$REGION" | tee "$tmp"
 	grep -E '^[0-9]+,' "$tmp" | sed "s/^/${layout},/" >>"$POUT"
 	rm "$tmp"
+	echo "=== $layout / parquet-java (Hadoop S3A) ==="
+	tmp=$(mktemp)
+	"$PARQUET_JAVA_BIN" -cp "$PARQUET_JAVA_CP" io.geoverse.bench.ParquetJavaR2GeographicJumpBench "$BUCKET" "$object" "$WORKLOAD" "$ENDPOINT" "$REGION" | tee "$tmp"
+	grep -E '^[0-9]+,' "$tmp" | sed "s/^/${layout},/" >>"$JOUT"
+	rm "$tmp"
 }
 run_one raw raw.parquet
 run_one optimized-v1.1 optimized-v1.1.parquet
@@ -36,3 +45,6 @@ cat "$DOUT"
 echo
 echo "Parquetry: $POUT"
 cat "$POUT"
+echo
+echo "parquet-java: $JOUT"
+cat "$JOUT"

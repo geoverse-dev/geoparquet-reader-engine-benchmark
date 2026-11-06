@@ -20,11 +20,7 @@ def normalize(row):
     reader = row["reader"]
     legacy = "reader_config" not in row
     if legacy:
-        reader_config = (
-            "DuckDB legacy unspecified"
-            if reader == "duckdb"
-            else "Parquetry legacy unspecified"
-        )
+        reader_config = f"{reader} legacy unspecified"
     else:
         reader_config = row["reader_config"]
 
@@ -56,20 +52,29 @@ by_query = defaultdict(dict)
 for row in observations:
     by_query[(row["layout"], row["query"])][row["reader"]] = row
 
+readers_present = sorted({row["reader"] for row in observations})
+comparison_readers = [reader for reader in readers_present if reader != "duckdb"]
 validation = defaultdict(lambda: {"compared": 0, "mismatches": 0, "missing": 0})
 for (layout, query), readers in by_query.items():
     size = query.split("-")[0]
-    state = validation[(layout, size)]
-    if "duckdb" not in readers or "parquetry" not in readers:
-        state["missing"] += 1
-        continue
-    state["compared"] += 1
-    if int(readers["duckdb"]["rows"]) != int(readers["parquetry"]["rows"]):
-        state["mismatches"] += 1
+    for reader in comparison_readers:
+        states = (
+            validation[(layout, size, reader)],
+            validation[(layout, size, "duckdb")],
+        )
+        if "duckdb" not in readers or reader not in readers:
+            for state in states:
+                state["missing"] += 1
+            continue
+        for state in states:
+            state["compared"] += 1
+        if int(readers["duckdb"]["rows"]) != int(readers[reader]["rows"]):
+            for state in states:
+                state["mismatches"] += 1
 
 
-def validation_status(layout, size):
-    state = validation[(layout, size)]
+def validation_status(layout, size, reader):
+    state = validation[(layout, size, reader)]
     if state["missing"]:
         return "incomplete"
     if state["mismatches"]:
@@ -105,8 +110,8 @@ for key, group_rows in sorted(groups.items()):
         size,
     ) = key
     elapsed = [float(row["elapsed_ms"]) for row in group_rows]
-    state = validation[(layout, size)]
-    status = validation_status(layout, size)
+    state = validation[(layout, size, reader)]
+    status = validation_status(layout, size, reader)
 
     if benchmark_mode == "cache_aligned":
         comparison_status = (
@@ -161,13 +166,13 @@ if "legacy_unspecified" in modes:
     )
 if any(state["mismatches"] for state in validation.values()):
     details = ", ".join(
-        f"{layout}/{size}={state['mismatches']}/{state['compared']}"
-        for (layout, size), state in sorted(validation.items())
-        if state["mismatches"]
+        f"{layout}/{size}/{reader}={state['mismatches']}/{state['compared']}"
+        for (layout, size, reader), state in sorted(validation.items())
+        if state["mismatches"] and reader != "duckdb"
     )
     print(
-        "WARNING: DuckDB bbox-column and Parquetry geometry-bbox row counts "
-        f"differ for queries: {details}.",
+        "WARNING: reader row counts differ from DuckDB for queries: "
+        f"{details}.",
         file=sys.stderr,
     )
 

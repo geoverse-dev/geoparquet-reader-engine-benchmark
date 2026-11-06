@@ -1,13 +1,13 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
-.PHONY: help check setup build data optimize smoke bench report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report all
+.PHONY: help check setup build data optimize smoke bench report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report benchmark-suite all
 help:
-	@echo "GeoParquet reader benchmark (DuckDB vs Parquetry)"
+	@echo "GeoParquet reader benchmark (DuckDB vs Parquetry vs parquet-java)"
 	@echo "  make check              Check requirements"
 	@echo "  make setup              Install Python deps, clone/build Parquetry + Java"
 	@echo "  make build              Rebuild Parquetry + Java benchmark"
-	@echo "  make smoke              1 remote query per layout/engine"
-	@echo "  make bench              DuckDB default vs cached Parquetry (150 BBOX/layout)"
+	@echo "  make smoke              1 remote query per layout/reader"
+	@echo "  make bench              Compare all 3 readers (150 BBOX/layout)"
 	@echo "  PARQUETRY_CACHE=off make bench  Uncached Parquetry diagnostic"
 	@echo "  make report             Summarize existing benchmark CSV"
 	@echo "  make cache              Tileverse cache vs no-cache"
@@ -20,6 +20,7 @@ help:
 	@echo "  make bench-concurrent-mixed 3 mixed repetitions and summary"
 	@echo "  make bench-concurrent-cold  3 cold repetitions and summary"
 	@echo "  make bench-concurrent-report All 3 scenarios (9 runs)"
+	@echo "  make benchmark-suite    Full 3-reader sequential/concurrent suite"
 	@echo "  make data               Download public datasets (about 7 GiB total)"
 	@echo "  make optimize           Generate optimized layouts from local raw"
 	@echo "  make all                Run main benchmark and diagnostics"
@@ -62,3 +63,4 @@ bench-concurrent-cold:
 bench-concurrent-report: bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold
 	@tar -czf results/geoparquet-concurrency-report-data.tar.gz -C results report-concurrency
 	@echo "Archive: results/geoparquet-concurrency-report-data.tar.gz"
+benchmark-suite: bench geographic-jumps memory bench-concurrent-report

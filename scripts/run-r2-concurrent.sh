@@ -13,6 +13,11 @@ OUT="${OUT:-results/r2-concurrent.csv}"
 	exit 2
 }
 CP="java/target/classes:$(cat java/target/classpath.txt)"
+[[ -f java-parquet/target/classpath.txt ]] || {
+	echo 'Run make build first' >&2
+	exit 2
+}
+PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
 case "$SCENARIO" in cold | warm | mixed) ;; *)
 	echo 'SCENARIO must be cold, warm or mixed' >&2
 	exit 2
@@ -37,12 +42,14 @@ TMP_OUT="$(mktemp "${OUT}.tmp.XXXXXX")"
 trap 'rm -f "$TMP_OUT"' EXIT
 printf '%s\n' 'engine,scenario,concurrency,queries,wall_ms,qps,p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows' >"$TMP_OUT"
 for level in $LEVELS; do
-	for engine in duckdb parquetry; do
+	for engine in duckdb parquetry parquet-java; do
 		echo "Running $engine scenario=$SCENARIO concurrency=$level queries=$QUERIES" >&2
 		if [[ "$engine" == duckdb ]]; then
 			uv run --frozen python python/duckdb_r2_concurrent_bench.py --bucket "$R2_BUCKET" --object "$OBJECT" --workload "$WORKLOAD" --concurrency "$level" --queries "$QUERIES" --warmup "$WARMUP" --scenario "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
-		else
+		elif [[ "$engine" == parquetry ]]; then
 			java --enable-preview --enable-native-access=ALL-UNNAMED -cp "$CP" io.geoverse.bench.ParquetryR2ConcurrentBench "$R2_BUCKET" "$OBJECT" "$WORKLOAD" "$R2_ENDPOINT" "$R2_REGION" "$level" "$QUERIES" "$WARMUP" "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
+		else
+			"$PARQUET_JAVA_BIN" -cp "$PARQUET_JAVA_CP" io.geoverse.bench.ParquetJavaR2ConcurrentBench "$R2_BUCKET" "$OBJECT" "$WORKLOAD" "$R2_ENDPOINT" "$R2_REGION" "$level" "$QUERIES" "$WARMUP" "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
 		fi
 	done
 done

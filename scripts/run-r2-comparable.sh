@@ -28,6 +28,9 @@ off)
 	;;
 esac
 
+PARQUET_JAVA_CONFIG="parquet-java + Hadoop S3A defaults"
+PARQUET_JAVA_ROW_CACHE_MODE="s3a_default"
+
 source "$(dirname "$0")/env.sh"
 
 OUT="${OUT:-$DEFAULT_OUT}"
@@ -41,8 +44,13 @@ fi
 	echo "Run make build first" >&2
 	exit 2
 }
+[[ -f java-parquet/target/classpath.txt ]] || {
+	echo "Run make build first" >&2
+	exit 2
+}
 
 CP="java/target/classes:$(cat java/target/classpath.txt)"
+PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
 HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,query,rows,elapsed_ms,remote_range_calls,remote_bytes_requested,remote_bytes_returned'
 echo "$HEADER" >"$OUT"
 
@@ -78,6 +86,21 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","$0}' >>"$OUT"
+
+	echo "$PARQUET_JAVA_CONFIG: $layout"
+	"$PARQUET_JAVA_BIN" \
+		-cp "$PARQUET_JAVA_CP" \
+		io.geoverse.bench.ParquetJavaR2ComparableBench \
+		"$R2_BUCKET" "$object" "$WORKLOAD" "$WARMUPS" \
+		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" |
+		awk -F, \
+			-v layout="$layout" \
+			-v reader_config="$PARQUET_JAVA_CONFIG" \
+			-v benchmark_mode="$BENCHMARK_MODE" \
+			-v cache_mode="$PARQUET_JAVA_ROW_CACHE_MODE" \
+			-v lifecycle="$CACHE_LIFECYCLE" \
+			-v warmups="$WARMUPS" \
+			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","$0}' >>"$OUT"
 done
 
 uv run --frozen python scripts/report-r2-comparable.py "$OUT" "$SUMMARY"

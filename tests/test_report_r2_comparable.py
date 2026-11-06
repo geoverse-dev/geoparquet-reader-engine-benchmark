@@ -36,6 +36,8 @@ class ReportComparableTest(unittest.TestCase):
             "persistent_warm_session,2,small-01,10,2.0,,,\n"
             "raw,parquetry,Parquetry + Tileverse Cache,cache_aligned,"
             "tileverse_on,persistent_warm_session,2,small-01,11,1.0,2,200,180\n"
+            "raw,parquet-java,parquet-java + Hadoop S3A defaults,cache_aligned,"
+            "s3a_default,persistent_warm_session,2,small-01,10,1.5,,,\n"
         )
 
         self.assertIn("row counts differ", process.stderr)
@@ -43,6 +45,9 @@ class ReportComparableTest(unittest.TestCase):
         self.assertEqual("tileverse_on", parquetry["cache_mode"])
         self.assertEqual("row_count_mismatch", parquetry["validation_status"])
         self.assertEqual("2", parquetry["remote_range_calls"])
+        parquet_java = next(row for row in rows if row["reader"] == "parquet-java")
+        self.assertEqual("row_counts_match", parquet_java["validation_status"])
+        self.assertEqual("s3a_default", parquet_java["cache_mode"])
 
     def test_legacy_report_is_not_labeled_cache_aligned(self):
         process, rows = self.run_report(

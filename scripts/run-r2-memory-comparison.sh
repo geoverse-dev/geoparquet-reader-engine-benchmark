@@ -10,10 +10,13 @@ WORKLOAD="${WORKLOAD:-config/workload-memory.csv}"
 mkdir -p results
 
 (cd java && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
+(cd java-parquet && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
 CP="java/target/classes:$(cat java/target/classpath.txt)"
+PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
 
 echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes" >results/r2-duckdb-memory.csv
 echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,heap_used_bytes,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats" >results/r2-parquetry-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,heap_used_bytes" >results/r2-parquet-java-memory.csv
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
 	layout="${spec%%:*}"
@@ -29,7 +32,14 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 		"$BUCKET" "$obj" "$WORKLOAD" "$R2_ENDPOINT" "$REGION" "$layout" |
 		tee /tmp/parq-mem.txt
 	grep '^parquetry-cache,' /tmp/parq-mem.txt >>results/r2-parquetry-memory.csv
+
+	echo "=== parquet-java+S3A $layout ==="
+	"$PARQUET_JAVA_BIN" -cp "$PARQUET_JAVA_CP" io.geoverse.bench.ParquetJavaR2MemoryBench \
+		"$BUCKET" "$obj" "$WORKLOAD" "$R2_ENDPOINT" "$REGION" "$layout" |
+		tee /tmp/parquet-java-mem.txt
+	grep '^parquet-java-s3a,' /tmp/parquet-java-mem.txt >>results/r2-parquet-java-memory.csv
 done
 
 echo "DuckDB:    results/r2-duckdb-memory.csv"
 echo "Parquetry: results/r2-parquetry-memory.csv"
+echo "parquet-java: results/r2-parquet-java-memory.csv"
