@@ -9,7 +9,6 @@ import io.tileverse.parquetry.filter.Projection;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
-import io.tileverse.parquetry.tileverse.ByteRangeSources;
 import io.tileverse.storage.RangeReader;
 import io.tileverse.storage.Storage;
 import io.tileverse.storage.cache.CachingRangeReader;
@@ -51,7 +50,7 @@ public final class ParquetryR2MemoryBench {
    try(client; Storage storage=S3StorageProvider.open(URI.create("s3://"+bucket+"/"),client)){
      RangeReader base=storage.openRangeReader(object);
      CachingRangeReader cached=CachingRangeReader.builder(base).build();
-     try(cached; ByteRangeSource src=ByteRangeSources.from(cached)){
+     try(cached; ByteRangeSource src=ByteRangeSource.of(cached)){
        ParquetSource ds=ParquetSource.open(src);
        Projection pr=Projection.ofPhysical(List.of(ColumnPath.of("id"),ColumnPath.of("geometry"),ColumnPath.of("bbox")));
        long baseRss=procMem()[0];

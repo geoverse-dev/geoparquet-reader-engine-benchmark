@@ -10,7 +10,6 @@ import io.tileverse.parquetry.filter.Projection;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
-import io.tileverse.parquetry.tileverse.ByteRangeSources;
 
 import io.tileverse.storage.RangeReader;
 import io.tileverse.storage.Storage;
@@ -186,7 +185,7 @@ public final class ParquetryR2TileverseCacheBench {
                     : physical;
 
             try (effective) {
-                ByteRangeSource byteSource = ByteRangeSources.from(effective);
+                ByteRangeSource byteSource = ByteRangeSource.of(effective);
                 try (byteSource) {
                     ParquetSource dataset = ParquetSource.open(byteSource);
 

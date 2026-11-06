@@ -6,7 +6,6 @@ import io.tileverse.parquetry.filter.*;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
-import io.tileverse.parquetry.tileverse.ByteRangeSources;
 import io.tileverse.storage.*;
 import io.tileverse.storage.s3.S3StorageProvider;
 import software.amazon.awssdk.auth.credentials.*;
@@ -28,7 +27,7 @@ public final class ParquetryR2GeographicJumpBench {
   List<String> lines=Files.readAllLines(Path.of(a[2]));
   try(S3AsyncClient c=S3AsyncClient.builder().endpointOverride(URI.create(a[3])).region(Region.of(a[4])).credentialsProvider(StaticCredentialsProvider.create(AwsBasicCredentials.create(System.getenv("AWS_ACCESS_KEY_ID"),System.getenv("AWS_SECRET_ACCESS_KEY")))).forcePathStyle(true).build();
       Storage st=S3StorageProvider.open(URI.create("s3://"+a[0]+"/"),c);
-      CRR rr=new CRR(st.openRangeReader(a[1])); ByteRangeSource src=ByteRangeSources.from(rr)){
+      CRR rr=new CRR(st.openRangeReader(a[1])); ByteRangeSource src=ByteRangeSource.of(rr)){
    ParquetSource ds=ParquetSource.open(src);
    Projection pr=Projection.ofPhysical(List.of(ColumnPath.of("id"),ColumnPath.of("geometry"),ColumnPath.of("bbox")));
    System.out.println("position,query,rows,elapsed_ms,range_calls,range_bytes_requested,range_bytes_returned");

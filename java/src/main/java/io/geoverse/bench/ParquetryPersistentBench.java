@@ -8,7 +8,7 @@ import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetDataset;
 import io.tileverse.parquetry.filter.Bbox;
 import io.tileverse.parquetry.filter.Predicate;
-import io.tileverse.parquetry.io.LocalFileSource;
+import io.tileverse.parquetry.io.FileSource;
 
 import java.io.BufferedReader;
 import java.nio.file.Files;
@@ -25,7 +25,7 @@ public final class ParquetryPersistentBench {
         Path workload = Path.of(args[1]).toAbsolutePath();
         int warmups = Integer.parseInt(args[2]);
 
-        try (FilesetCatalog catalog = FilesetCatalog.open(LocalFileSource.file(file), CatalogOptions.defaults())) {
+        try (FilesetCatalog catalog = FilesetCatalog.open(FileSource.file(file), CatalogOptions.defaults())) {
             ParquetDataset dataset = catalog.dataset(catalog.datasets().get(0));
             for (int w = 0; w < warmups; w++) runWorkload(dataset, workload, false, w);
             runWorkload(dataset, workload, true, 0);

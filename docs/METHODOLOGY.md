@@ -12,7 +12,7 @@ git -C vendor/parquetry checkout 876687bc865fb3fc0526bd3c7d69d030db6a7d44
 make build
 ```
 
-Because Parquetry's upstream build and dependency graph may evolve, the historical commit may require adjustments. The default setup checks out this recorded commit. Set `PARQUETRY_REF` to use a different revision. The benchmark source and Maven coordinates are from the provided archive.
+Because Parquetry's upstream build and dependency graph may evolve, the historical commit may require adjustments. The default setup fetches the upstream repository and checks out the latest `origin/main` commit. Set `PARQUETRY_REF` to a branch, tag, or commit for a reproducible run. Always record the resolved commit printed by setup with published benchmark results. The benchmark source and Maven coordinates are from the provided archive.
 
 ## Dataset
 

@@ -18,12 +18,9 @@ fi
 		MVN=(mvn)
 	fi
 
-	# Install test fixtures required by downstream modules.
-	"${MVN[@]}" -q -pl :parquetry-io -am -DskipTests install
-	"${MVN[@]}" -q -pl :parquetry-core -am -DskipTests install
-
-	# Build Tileverse Storage without compiling incompatible tests.
-	"${MVN[@]}" -q -pl :parquetry-tileverse-storage -am \
+	# Install Parquetry and its dependency-management POM for the benchmark.
+	# Tileverse Storage is now an external dependency managed by Parquetry.
+	"${MVN[@]}" -q -pl :parquetry-catalog -am \
 		-Dmaven.test.skip=true install
 )
 

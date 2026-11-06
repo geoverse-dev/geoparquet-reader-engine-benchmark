@@ -11,8 +11,9 @@ uv sync --frozen
 if [[ ! -f vendor/parquetry/pom.xml ]]; then
 	git clone https://github.com/tileverse-io/parquetry.git vendor/parquetry
 fi
-PARQUETRY_REF="${PARQUETRY_REF:-876687bc865fb3fc0526bd3c7d69d030db6a7d44}"
-git -C vendor/parquetry checkout "$PARQUETRY_REF"
+git -C vendor/parquetry fetch --prune --tags origin
+PARQUETRY_REF="${PARQUETRY_REF:-origin/main}"
+git -C vendor/parquetry checkout --detach "$PARQUETRY_REF"
 git -C vendor/parquetry submodule update --init --recursive
 echo "Parquetry source: $(git -C vendor/parquetry rev-parse HEAD)"
 bash scripts/build-java.sh

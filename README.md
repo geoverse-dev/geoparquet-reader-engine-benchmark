@@ -10,7 +10,7 @@ The original study uses Overture Maps **Argentina buildings** (~26.77 million re
 
 Linux or macOS shell, `git`, `curl`, `make`, **Java 25** (including preview features), Maven, Python 3.11+, and [uv](https://docs.astral.sh/uv/). AWS CLI is optional if you supply R2 credentials through environment variables. Downloading datasets locally requires ~7 GiB free; **remote benchmarks do not require local data**. A working network connection is required for dependencies and Cloudflare R2.
 
-**Parquetry is a source dependency** (snapshot artifacts). `make setup` clones `https://github.com/tileverse-io/parquetry` into `vendor/parquetry` and builds it with Maven. This ZIP deliberately does not contain the upstream library or precompiled JARs. For reproducible builds, `make setup` checks out the Parquetry commit recorded in `docs/METHODOLOGY.md` by default. Override it with `PARQUETRY_REF` if needed.
+**Parquetry is a source dependency** (snapshot artifacts). `make setup` clones `https://github.com/tileverse-io/parquetry` into `vendor/parquetry`, fetches the remote, and builds the latest commit from `origin/main` by default. This repository deliberately does not contain the upstream library or precompiled JARs. For a reproducible run, pin a branch, tag, or commit with `PARQUETRY_REF`, for example `PARQUETRY_REF=876687bc865fb3fc0526bd3c7d69d030db6a7d44 make setup`. The exact resolved commit is printed by setup and should be recorded with published results.
 
 ## Quick start (remote comparison)
 

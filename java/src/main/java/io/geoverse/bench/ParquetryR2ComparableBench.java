@@ -10,7 +10,6 @@ import io.tileverse.parquetry.filter.Projection;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
-import io.tileverse.parquetry.tileverse.ByteRangeSources;
 import io.tileverse.storage.RangeReader;
 import io.tileverse.storage.Storage;
 import io.tileverse.storage.cache.CachingRangeReader;
@@ -148,7 +147,7 @@ public final class ParquetryR2ComparableBench {
             // below the optional cache and therefore measure only delegate reads.
             try (
                 effective;
-                ByteRangeSource bytes = ByteRangeSources.from(effective)
+                ByteRangeSource bytes = ByteRangeSource.of(effective)
             ) {
                 ParquetSource dataset = ParquetSource.open(bytes);
                 System.err.printf(

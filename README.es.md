@@ -25,10 +25,12 @@ Descargar los datasets requiere unos 7 GiB libres; **los benchmarks remotos no
 necesitan datos locales**. Se requiere conexión de red para dependencias y R2.
 
 **Parquetry es una dependencia de fuentes** con artefactos snapshot. `make setup`
-clona `https://github.com/tileverse-io/parquetry` en `vendor/parquetry` y lo compila
-con Maven. El repositorio no incluye esa biblioteca ni JAR precompilados. Para una
-compilación reproducible, `make setup` usa por defecto el commit registrado en
-`docs/METHODOLOGY.md`; puede cambiarse con `PARQUETRY_REF`.
+clona `https://github.com/tileverse-io/parquetry` en `vendor/parquetry`, actualiza
+el remoto y compila por defecto el último commit de `origin/main`. El repositorio no
+incluye esa biblioteca ni JAR precompilados. Para una corrida reproducible se puede
+fijar una rama, tag o commit con `PARQUETRY_REF`, por ejemplo
+`PARQUETRY_REF=876687bc865fb3fc0526bd3c7d69d030db6a7d44 make setup`. Setup imprime
+el commit resuelto, que debe registrarse junto con los resultados publicados.
 
 ## Inicio rápido: comparación remota
 

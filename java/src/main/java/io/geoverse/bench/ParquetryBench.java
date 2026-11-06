@@ -8,7 +8,7 @@ import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetDataset;
 import io.tileverse.parquetry.filter.Bbox;
 import io.tileverse.parquetry.filter.Predicate;
-import io.tileverse.parquetry.io.LocalFileSource;
+import io.tileverse.parquetry.io.FileSource;
 
 import java.nio.file.Path;
 import java.util.Locale;
@@ -37,7 +37,7 @@ public final class ParquetryBench {
 
         try (FilesetCatalog catalog =
                      FilesetCatalog.open(
-                             LocalFileSource.file(file),
+                             FileSource.file(file),
                              CatalogOptions.defaults())) {
 
             ParquetDataset dataset =

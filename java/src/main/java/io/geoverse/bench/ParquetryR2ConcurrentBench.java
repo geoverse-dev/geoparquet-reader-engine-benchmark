@@ -9,7 +9,6 @@ import io.tileverse.parquetry.filter.*;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
-import io.tileverse.parquetry.tileverse.ByteRangeSources;
 
 import io.tileverse.storage.RangeReader;
 import io.tileverse.storage.Storage;
@@ -157,7 +156,7 @@ public final class ParquetryR2ConcurrentBench {
                 .builder(physical)
                 .build();
 
-            ByteRangeSource bytes = ByteRangeSources.from(cached)
+            ByteRangeSource bytes = ByteRangeSource.of(cached)
         ) {
 
             // One ParquetSource shared by all workers.
