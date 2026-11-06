@@ -1,5 +1,7 @@
 # Remote GeoParquet Reader Benchmark: DuckDB vs Parquetry
 
+[Leer en español](README.es.md)
+
 A reproducible benchmark harness comparing **DuckDB/httpfs** and **Parquetry + Tileverse Storage** reading remote GeoParquet over S3-compatible object storage (Cloudflare R2 in the original experiments). The repository evaluates the **underlying readers**, not GeoServer WMS/WFS or DataStore implementations. It does **not** include the separate Portolan CLI experiments.
 
 The original study uses Overture Maps **Argentina buildings** (~26.77 million records) in three layouts: `raw`, Hilbert/ZSTD GeoParquet 1.1, and Hilbert/ZSTD GeoParquet 2.0. The principal benchmark uses **150 BBOX queries** and compares DuckDB's default reader configuration with Parquetry using Tileverse `CachingRangeReader` by default. It measures latency, row counts, percentiles, and Parquetry delegate range reads; diagnostic runs examine first-read I/O, cache reuse, geographic jumps, and process memory.
