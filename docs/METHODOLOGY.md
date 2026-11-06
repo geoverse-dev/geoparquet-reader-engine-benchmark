@@ -23,12 +23,14 @@ Input/output SHA256 checksums from the study are preserved in `results/reference
 ## Main benchmark: `make bench`
 
 - Files: raw, optimized 1.1, optimized 2.0.
-- Readers: DuckDB `read_parquet` with `httpfs` and Parquetry with Tileverse S3 range reader.
+- Readers: DuckDB `read_parquet` with unchanged `httpfs` defaults and Parquetry with a Tileverse `CachingRangeReader` over the S3 range reader by default.
 - Same 150 named BBOX windows from `config/workload-persistent.csv` (50 small, 50 medium, 50 large).
-- Persistent process and reader for a full workload per layout; `WARMUPS` full warmup passes, then measured pass.
+- Persistent process and reader for a full workload per layout; `WARMUPS` full warmup passes, then measured pass. The same Parquetry cache and `ParquetSource` survive both phases.
 - Both select `id`, `geometry`, and `bbox`, and fully consume results.
-- CSV records row count and elapsed time per BBOX. Summary reports median/mean/p95/p99.
+- CSV records configuration labels, row count and elapsed time per BBOX. Parquetry also reports delegate range calls and bytes below the cache. Summary reports median/mean/p95/p99 and row-count validation.
 - Important limitation: DuckDB uses `bbox` column intersection while Parquetry uses geometry bbox predicate. The outputs are not guaranteed row-identical.
+
+`PARQUETRY_CACHE=off make bench` is an explicitly labeled no-cache diagnostic and writes `r2-comparable-nocache-*` outputs by default. It is not merged into the primary cache-aligned result. `WARMUPS=0` means no deliberate session prewarming, not a guarantee that external caches are empty. This benchmark compares two reader configurations as systems; it does not claim identical cache implementations or isolate intrinsic decoder performance.
 
 ## Diagnostics
 

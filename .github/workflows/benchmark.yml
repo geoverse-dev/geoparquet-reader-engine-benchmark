@@ -30,6 +30,8 @@ jobs:
           find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
       - name: Python syntax
         run: python3 -m compileall -q python scripts
+      - name: Report regression tests
+        run: python3 -m unittest discover -s tests -v
       - name: Check scenario wrappers
         run: |
           python3 - <<'PYTEST'
