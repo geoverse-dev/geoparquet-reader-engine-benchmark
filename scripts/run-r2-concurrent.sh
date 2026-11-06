@@ -42,7 +42,7 @@ for level in $LEVELS; do
 		if [[ "$engine" == duckdb ]]; then
 			uv run --frozen python python/duckdb_r2_concurrent_bench.py --bucket "$R2_BUCKET" --object "$OBJECT" --workload "$WORKLOAD" --concurrency "$level" --queries "$QUERIES" --warmup "$WARMUP" --scenario "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
 		else
-			java --enable-preview --enable-native-access=ALL-UNNAMED -cp "$CP" io.multiversio.bench.ParquetryR2ConcurrentBench "$R2_BUCKET" "$OBJECT" "$WORKLOAD" "$R2_ENDPOINT" "$R2_REGION" "$level" "$QUERIES" "$WARMUP" "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
+			java --enable-preview --enable-native-access=ALL-UNNAMED -cp "$CP" io.geoverse.bench.ParquetryR2ConcurrentBench "$R2_BUCKET" "$OBJECT" "$WORKLOAD" "$R2_ENDPOINT" "$R2_REGION" "$level" "$QUERIES" "$WARMUP" "$SCENARIO" | tail -n +2 >>"$TMP_OUT"
 		fi
 	done
 done

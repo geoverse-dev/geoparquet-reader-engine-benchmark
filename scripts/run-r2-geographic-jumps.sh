@@ -23,7 +23,7 @@ run_one() {
 	rm "$tmp"
 	echo "=== $layout / parquetry ==="
 	tmp=$(mktemp)
-	java --enable-preview -cp "$CP" io.multiversio.bench.ParquetryR2GeographicJumpBench "$BUCKET" "$object" "$WORKLOAD" "$ENDPOINT" "$REGION" | tee "$tmp"
+	java --enable-preview -cp "$CP" io.geoverse.bench.ParquetryR2GeographicJumpBench "$BUCKET" "$object" "$WORKLOAD" "$ENDPOINT" "$REGION" | tee "$tmp"
 	grep -E '^[0-9]+,' "$tmp" | sed "s/^/${layout},/" >>"$POUT"
 	rm "$tmp"
 }

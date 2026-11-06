@@ -67,7 +67,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 	echo "$PARQUETRY_CONFIG: $layout"
 	java --enable-preview --enable-native-access=ALL-UNNAMED \
 		-cp "$CP" \
-		io.multiversio.bench.ParquetryR2ComparableBench \
+		io.geoverse.bench.ParquetryR2ComparableBench \
 		"$R2_BUCKET" "$object" "$WORKLOAD" "$WARMUPS" \
 		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" "$PARQUETRY_CACHE" |
 		awk -F, \

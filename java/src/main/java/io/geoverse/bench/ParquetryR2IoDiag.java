@@ -1,4 +1,4 @@
-package io.multiversio.bench;
+package io.geoverse.bench;
 
 import static io.tileverse.parquetry.filter.Pred.col;
 

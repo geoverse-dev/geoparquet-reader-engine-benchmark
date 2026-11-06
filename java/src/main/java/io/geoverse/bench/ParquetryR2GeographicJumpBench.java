@@ -1,4 +1,4 @@
-package io.multiversio.bench;
+package io.geoverse.bench;
 import static io.tileverse.parquetry.filter.Pred.col;
 import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetSource;

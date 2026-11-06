@@ -36,7 +36,7 @@ run_case() {
 
 	java --enable-preview \
 		-cp "$CP" \
-		io.multiversio.bench.ParquetryR2TileverseCacheBench \
+		io.geoverse.bench.ParquetryR2TileverseCacheBench \
 		"$BUCKET" "$object" "$WORKLOAD" "$ENDPOINT" "$REGION" \
 		"$mode" "$ROUNDS" | tee "$tmp"
 

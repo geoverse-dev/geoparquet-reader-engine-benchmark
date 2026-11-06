@@ -25,7 +25,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 	grep '^duckdb,' /tmp/duck-mem.txt >>results/r2-duckdb-memory.csv
 
 	echo "=== Parquetry+cache $layout ==="
-	java --enable-preview -cp "$CP" io.multiversio.bench.ParquetryR2MemoryBench \
+	java --enable-preview -cp "$CP" io.geoverse.bench.ParquetryR2MemoryBench \
 		"$BUCKET" "$obj" "$WORKLOAD" "$R2_ENDPOINT" "$REGION" "$layout" |
 		tee /tmp/parq-mem.txt
 	grep '^parquetry-cache,' /tmp/parq-mem.txt >>results/r2-parquetry-memory.csv
