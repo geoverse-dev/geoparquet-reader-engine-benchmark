@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import duckdb
 
+from python.cache_profile import apply_duckdb_profile
 from python.query_contract import materialized_multiset_hash
 
 parser = argparse.ArgumentParser()
@@ -34,6 +35,7 @@ parser.add_argument(
 parser.add_argument(
     "--operation", choices=["scan", "materialize"], default="materialize"
 )
+parser.add_argument("--profile", choices=["default", "tuned"], default="default")
 
 args = parser.parse_args()
 
@@ -80,6 +82,7 @@ con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
 
 configure_r2(con)
+apply_duckdb_profile(con, args.profile)
 
 selected = "id, geometry, bbox" if args.operation == "materialize" else "id"
 sql = (
@@ -156,6 +159,7 @@ def query(index):
     if not hasattr(local, "cursor"):
         local.cursor = con.cursor()
         configure_r2(local.cursor)
+        apply_duckdb_profile(local.cursor, args.profile)
 
     if args.scenario == "warm":
         row = windows[index % hot]

@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 
 import duckdb
 
+from python.cache_profile import apply_duckdb_profile
 from python.query_contract import materialized_multiset_hash
 
 p = argparse.ArgumentParser()
@@ -17,6 +18,7 @@ p.add_argument("--workload", required=True)
 p.add_argument("--warmups", type=int, default=2)
 p.add_argument("--limit", type=int, default=0)
 p.add_argument("--operation", choices=["scan", "materialize"], default="materialize")
+p.add_argument("--profile", choices=["default", "tuned"], default="default")
 a = p.parse_args()
 u = urlparse(os.environ["R2_ENDPOINT"])
 host = u.netloc or u.path
@@ -37,6 +39,11 @@ setting("s3_secret_access_key", os.environ["AWS_SECRET_ACCESS_KEY"])
 setting("s3_region", os.environ.get("R2_REGION", "auto"))
 setting("s3_url_style", "path")
 con.execute("SET s3_use_ssl=true")
+resolved_profile = apply_duckdb_profile(con, a.profile)
+print(
+    f"# duckdb_profile={a.profile} cache_configuration={resolved_profile}",
+    file=sys.stderr,
+)
 print(f"# init_ms={(time.perf_counter_ns() - t0) / 1e6:.3f}", file=sys.stderr)
 with open(a.workload, newline="") as f:
     rows = list(csv.DictReader(f))

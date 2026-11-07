@@ -40,6 +40,21 @@ Input/output SHA256 checksums from the study are preserved in `results/reference
 
 ## Diagnostics
 
+## Cache and I/O metric taxonomy
+
+Benchmark metadata distinguishes logical reader requests, reads reaching a storage
+delegate, actual HTTP requests, and transferred network bytes. The current
+Parquetry counters are explicitly labeled `delegate_*`; they are not HTTP request
+counters. Metrics that DuckDB/httpfs or Hadoop S3A do not expose reliably are
+written as `not_available`, never inferred. Cache implementation and configuration
+remain part of the compared system.
+
+`DUCKDB_PROFILE=default` applies no additional settings. The opt-in `tuned` profile
+enables connection and metadata caches and disables external-file-cache validation
+by default, assuming immutable benchmark objects; each setting can be overridden
+with its corresponding `DUCKDB_<SETTING>` environment variable. The resolved
+profile is recorded with every row and must not be aggregated with `default`.
+
 - `make io-diagnostics`: first small window; DuckDB HTTP/FileSystem logs vs Parquetry logical ranges.
 - `make duckdb-cache`: measure DuckDB I/O at selected query positions.
 - `make geographic-jumps`: six separated Argentine regions and a Tandil repeat.

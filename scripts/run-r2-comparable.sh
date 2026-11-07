@@ -7,6 +7,7 @@ LIMIT="${LIMIT:-0}"
 PARQUETRY_CACHE="${PARQUETRY_CACHE:-on}"
 OPERATION="${OPERATION:-materialize}"
 QUERY_CONTRACT="bbox-v1"
+DUCKDB_PROFILE="${DUCKDB_PROFILE:-default}"
 case "$OPERATION" in scan|materialize) ;; *) echo "OPERATION must be scan or materialize" >&2; exit 2;; esac
 
 case "$PARQUETRY_CACHE" in
@@ -54,7 +55,7 @@ fi
 
 CP="java/target/classes:$(cat java/target/classpath.txt)"
 PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
-HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,remote_range_calls,remote_bytes_requested,remote_bytes_returned'
+HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,delegate_read_calls,delegate_bytes_requested,delegate_bytes_returned,cache_enabled,cache_implementation,cache_capacity_bytes,cache_configuration,http_requests,network_bytes_transferred'
 echo "$HEADER" >"$OUT"
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
@@ -67,14 +68,14 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 		--object "$object" \
 		--workload "$WORKLOAD" \
 		--warmups "$WARMUPS" \
-		--limit "$LIMIT" --operation "$OPERATION" |
+		--limit "$LIMIT" --operation "$OPERATION" --profile "$DUCKDB_PROFILE" |
 		awk -F, \
 			-v layout="$layout" \
 			-v benchmark_mode="$BENCHMARK_MODE" \
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			'{print layout",duckdb,DuckDB default,"benchmark_mode",duckdb_default,"lifecycle","warmups","operation","contract","$0",,,"}' >>"$OUT"
+			-v profile="$DUCKDB_PROFILE" '{print layout",duckdb,DuckDB "profile","benchmark_mode",duckdb_"profile","lifecycle","warmups","operation","contract","$0",not_available,not_available,not_available,true,duckdb_internal,not_available,"profile",not_available,not_available"}' >>"$OUT"
 
 	echo "$PARQUETRY_CONFIG: $layout"
 	java --enable-preview --enable-native-access=ALL-UNNAMED \
@@ -90,7 +91,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0}' >>"$OUT"
+			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",true,tileverse_caching_range_reader,not_available,"cache_mode",not_available,not_available"}' >>"$OUT"
 
 	echo "$PARQUET_JAVA_CONFIG: $layout"
 	"$PARQUET_JAVA_BIN" \
@@ -106,7 +107,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0}' >>"$OUT"
+			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",not_available,hadoop_s3a_default,not_available,s3a_default,not_available,not_available"}' >>"$OUT"
 done
 
 uv run --frozen python scripts/report-r2-comparable.py "$OUT" "$SUMMARY"
