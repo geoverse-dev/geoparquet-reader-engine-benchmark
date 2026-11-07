@@ -1,5 +1,11 @@
 # Experimental methodology and provenance
 
+The implementation baseline and known equivalence gaps for the three readers are
+documented in [Three-engine benchmark audit](THREE_ENGINE_AUDIT.md). That audit is
+the starting point for the versioned query contract, validation command, and
+equivalent `scan`/`materialize` operations. Current historical results predate
+those quality gates.
+
 ## Source archive and scope
 
 The repository contains Java and Python reader benchmarks, workload definitions, execution scripts, and result aggregation.
@@ -23,10 +29,10 @@ Input/output SHA256 checksums from the study are preserved in `results/reference
 ## Main benchmark: `make bench`
 
 - Files: raw, optimized 1.1, optimized 2.0.
-- Readers: DuckDB `read_parquet` with unchanged `httpfs` defaults and Parquetry with a Tileverse `CachingRangeReader` over the S3 range reader by default.
+- Readers: DuckDB `read_parquet` with unchanged `httpfs` defaults, Parquetry with a Tileverse `CachingRangeReader`, and parquet-java with Hadoop S3A defaults.
 - Same 150 named BBOX windows from `config/workload-persistent.csv` (50 small, 50 medium, 50 large).
 - Persistent process and reader for a full workload per layout; `WARMUPS` full warmup passes, then measured pass. The same Parquetry cache and `ParquetSource` survive both phases.
-- Both select `id`, `geometry`, and `bbox`, and fully consume results.
+- All three request `id`, `geometry`, and `bbox`, but their current consumption differs: DuckDB uses `fetchall()`, Parquetry counts its stream, and parquet-java iterates projected records. These results are not yet equivalent `materialize` measurements.
 - CSV records configuration labels, row count and elapsed time per BBOX. Parquetry also reports delegate range calls and bytes below the cache. Summary reports median/mean/p95/p99 and row-count validation.
 - Important limitation: DuckDB uses `bbox` column intersection while Parquetry uses geometry bbox predicate. The outputs are not guaranteed row-identical.
 
