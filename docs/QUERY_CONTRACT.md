@@ -75,3 +75,16 @@ duplicate count; a hash alone is not sufficient diagnostic output.
 
 The sequential, concurrent, and validation implementations must refer to the same
 contract version and predicate construction code within each language.
+
+### Local conformance check
+
+After `make build`, run:
+
+```bash
+make test-contract-engines
+```
+
+This generates an ephemeral fixture and applies `bbox-v1` through DuckDB,
+Parquetry, and parquet-java. It compares the complete ID multiset (including nulls
+and duplicates) and prints the row count, duplicate count, and canonical ID hash
+for each reader. It uses local files only and does not require R2 credentials.

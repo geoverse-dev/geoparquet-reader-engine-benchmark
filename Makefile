@@ -1,11 +1,12 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
-.PHONY: help check setup build data optimize smoke bench report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report benchmark-suite all
+.PHONY: help check setup build test-contract-engines data optimize smoke bench report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report benchmark-suite all
 help:
 	@echo "GeoParquet reader benchmark (DuckDB vs Parquetry vs parquet-java)"
 	@echo "  make check              Check requirements"
 	@echo "  make setup              Install Python deps, clone/build Parquetry + Java"
 	@echo "  make build              Rebuild Parquetry + Java benchmark"
+	@echo "  make test-contract-engines  Local bbox-v1 check across all readers"
 	@echo "  make smoke              1 remote query per layout/reader"
 	@echo "  make bench              Compare all 3 readers (150 BBOX/layout)"
 	@echo "  PARQUETRY_CACHE=off make bench  Uncached Parquetry diagnostic"
@@ -30,6 +31,8 @@ setup:
 	@bash scripts/setup.sh
 build:
 	@bash scripts/build-java.sh
+test-contract-engines:
+	@bash scripts/test-query-contract-engines.sh
 data:
 	@bash scripts/download-data.sh
 optimize:
