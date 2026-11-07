@@ -73,6 +73,14 @@ The Tileverse cache is a byte-range cache **below** the reader, not GeoWebCache 
 - Cache, network and process startup must be separated in any claims of speedup.
 - Linux-specific RSS `/proc` instrumentation may not work on macOS; Linux is recommended for memory comparisons.
 
+Resource reports use bytes consistently. `peak_rss_bytes` is Linux process
+high-water RSS and includes heap, native allocations, mapped buffers and runtime
+overhead. Java rows separately expose heap used/committed, non-heap, direct-buffer
+usage and cumulative GC count/pause time; these are not presented as substitutes
+for RSS. DuckDB records its resolved memory limit. Per-query memory uses the OS
+high-water mark (`sampling_interval_ms=not_applicable`); concurrent RSS sampling is
+25 ms and may miss shorter-lived spikes.
+
 ## Experimental concurrent workload
 
 `make bench-concurrent` is a separate concurrent workload. Its measurements are **not** historical paper results. It uses shared reader state and per-worker queries, with `cold`, `warm`, and `mixed` scenarios. Parquetry uses a shared Tileverse `CachingRangeReader`; parquet-java uses independent `ParquetReader` instances over one persistent Hadoop S3A filesystem. `cold` skips explicit warmup but is not guaranteed to have a cold OS/network cache. Each concurrency level runs in a fresh process. Results include throughput, latency distribution and sampled RSS. Compare row counts before drawing performance conclusions.

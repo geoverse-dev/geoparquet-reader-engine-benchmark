@@ -14,9 +14,9 @@ mkdir -p results
 CP="java/target/classes:$(cat java/target/classpath.txt)"
 PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
 
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes" >results/r2-duckdb-memory.csv
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,heap_used_bytes,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats" >results/r2-parquetry-memory.csv
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,heap_used_bytes" >results/r2-parquet-java-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,duckdb_memory_limit,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-duckdb-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats" >results/r2-parquetry-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-parquet-java-memory.csv
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
 	layout="${spec%%:*}"

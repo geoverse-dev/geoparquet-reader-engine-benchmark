@@ -64,7 +64,8 @@ public final class ParquetJavaR2MemoryBench {
         long baseRss = processMemory()[0];
         System.out.println(
             "engine,layout,position,query,rows,elapsed_ms,rss_bytes," +
-            "rss_delta_bytes,peak_rss_bytes,heap_used_bytes"
+            "rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes," +
+            "jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms"
         );
         int position = 0;
         for (Query query : queries) {
@@ -79,9 +80,10 @@ public final class ParquetJavaR2MemoryBench {
                 query.maxy()
             );
             long[] memory = processMemory();
+            ResourceMetrics.Snapshot resources = ResourceMetrics.snapshot();
             System.out.printf(
                 Locale.ROOT,
-                "parquet-java-s3a,%s,%d,%s,%d,%.6f,%d,%d,%d,%d%n",
+                "parquet-java-s3a,%s,%d,%s,%d,%.6f,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable%n",
                 args[5],
                 position,
                 query.name(),
@@ -90,7 +92,8 @@ public final class ParquetJavaR2MemoryBench {
                 memory[0],
                 memory[0] - baseRss,
                 memory[1],
-                heapUsed()
+                resources.heapUsed(), resources.heapCommitted(), resources.nonHeapUsed(),
+                resources.directBufferBytes(), resources.gcCount(), resources.gcPauseMs()
             );
         }
     }

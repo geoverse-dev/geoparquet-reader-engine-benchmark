@@ -54,7 +54,7 @@ public final class ParquetryR2MemoryBench {
        ParquetSource ds=ParquetSource.open(src);
        Projection pr=Projection.ofPhysical(List.of(ColumnPath.of("id"),ColumnPath.of("geometry"),ColumnPath.of("bbox")));
        long baseRss=procMem()[0];
-       System.out.println("engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,heap_used_bytes,cache_estimated_bytes,cache_entries,cache_hits,cache_misses");
+       System.out.println("engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats");
        int pos=0;
        for(Q q:qs){
          pos++;
@@ -64,11 +64,12 @@ public final class ParquetryR2MemoryBench {
          double ms=(System.nanoTime()-t)/1e6;
          long[] m=procMem();
          var st=cached.getCacheStats();
+         ResourceMetrics.Snapshot resources=ResourceMetrics.snapshot();
          // CacheStats API varies slightly across Tileverse versions, so emit its stable
          // string form as the final field and keep direct cache-size methods out: those
          // are package-private in current source.
-         System.out.printf(Locale.ROOT,"%s,%s,%d,%s,%d,%.6f,%d,%d,%d,%d,,,,\"%s\"%n",
-           "parquetry-cache",layout,pos,q.name,rows,ms,m[0],m[0]-baseRss,m[1],heapUsed(),st.toString().replace("\"","'"));
+         System.out.printf(Locale.ROOT,"%s,%s,%d,%s,%d,%.6f,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable,,,,,\"%s\"%n",
+           "parquetry-cache",layout,pos,q.name,rows,ms,m[0],m[0]-baseRss,m[1],resources.heapUsed(),resources.heapCommitted(),resources.nonHeapUsed(),resources.directBufferBytes(),resources.gcCount(),resources.gcPauseMs(),st.toString().replace("\"","'"));
        }
      }
    }

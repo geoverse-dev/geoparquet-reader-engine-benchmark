@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-import argparse, csv, os, resource, time
+import argparse
+import csv
+import os
+import time
+
 import duckdb
 
 
@@ -38,13 +42,16 @@ def main():
     con.execute("SET s3_secret_access_key=?", [os.environ["AWS_SECRET_ACCESS_KEY"]])
     con.execute("SET s3_url_style='path'")
     con.execute("SET s3_use_ssl=true")
+    memory_limit = con.execute("SELECT current_setting('memory_limit')").fetchone()[0]
 
     with open(args.workload) as f:
         qs = list(csv.DictReader(f))
 
     base_rss, _ = rss_bytes()
     print(
-        "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes"
+        "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,"
+        "duckdb_memory_limit,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,"
+        "jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms"
     )
     for i, q in enumerate(qs, 1):
         # Match the comparable benchmark projection and stored bbox predicate.
@@ -72,7 +79,9 @@ def main():
         ms = (time.perf_counter() - t) * 1000
         rss, peak = rss_bytes()
         print(
-            f"duckdb,{args.layout},{i},{q['name']},{rows},{ms:.6f},{rss},{rss - base_rss},{peak}",
+            f"duckdb,{args.layout},{i},{q['name']},{rows},{ms:.6f},{rss},{rss - base_rss},{peak},"
+            f"{memory_limit},not_available,not_available,not_available,not_available,not_available,"
+            "not_available,not_applicable",
             flush=True,
         )
 
