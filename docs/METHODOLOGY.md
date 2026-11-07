@@ -62,6 +62,15 @@ The Tileverse cache is a byte-range cache **below** the reader, not GeoWebCache 
 
 `make bench-concurrent` is a separate concurrent workload. Its measurements are **not** historical paper results. It uses shared reader state and per-worker queries, with `cold`, `warm`, and `mixed` scenarios. Parquetry uses a shared Tileverse `CachingRangeReader`; parquet-java uses independent `ParquetReader` instances over one persistent Hadoop S3A filesystem. `cold` skips explicit warmup but is not guaranteed to have a cold OS/network cache. Each concurrency level runs in a fresh process. Results include throughput, latency distribution and sampled RSS. Compare row counts before drawing performance conclusions.
 
+All three concurrent runners use the same ordered, closed-loop query sequence and
+the same `OPERATION=scan|materialize` contract as the sequential runner. Engine and
+dataset initialization, cache construction, and explicit warmup finish before the
+wall-clock measurement starts. Per-query latency starts inside the worker, after
+executor dispatch, so it excludes queue wait; wall time includes submission,
+queueing, execution, and complete result consumption. A query completes only after
+all matching records have been traversed and, for `materialize`, every selected
+value has contributed to the checksum. Cleanup occurs after timing.
+
 ## Repeated concurrency runs
 
 `make bench-concurrent-warm`, `make bench-concurrent-mixed`, and `make bench-concurrent-cold` each run the same three readers at the configured concurrency levels three times by default. Each reader/level is a separate process. The output CSVs retain individual run metrics; `<scenario>-summary.csv` records the median of each metric across repetitions. These medians must not be interpreted as pooled request-level p95/p99 values.

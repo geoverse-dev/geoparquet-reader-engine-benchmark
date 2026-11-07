@@ -1,8 +1,6 @@
 
 package io.geoverse.bench;
 
-import static io.tileverse.parquetry.filter.Pred.col;
-
 import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetSource;
 import io.tileverse.parquetry.filter.*;
@@ -42,6 +40,12 @@ import java.util.stream.Stream;
  * Reader thread safety must be validated under concurrent load.
  */
 public final class ParquetryR2ConcurrentBench {
+    static final ColumnPath ID = ColumnPath.of("id");
+    static final ColumnPath GEOMETRY = ColumnPath.of("geometry");
+    static final ColumnPath XMIN = ColumnPath.of("bbox", "xmin");
+    static final ColumnPath YMIN = ColumnPath.of("bbox", "ymin");
+    static final ColumnPath XMAX = ColumnPath.of("bbox", "xmax");
+    static final ColumnPath YMAX = ColumnPath.of("bbox", "ymax");
 
     record Window(
         String name,
@@ -70,16 +74,25 @@ public final class ParquetryR2ConcurrentBench {
     static long count(
         ParquetSource ds,
         Window w,
-        Projection projection
+        Projection projection,
+        String operation
     ) throws Exception {
 
-        Predicate predicate = col("geometry").bboxIntersects(
-            Bbox.of2d(w.minx, w.miny, w.maxx, w.maxy)
-        );
+        Predicate predicate = new Predicate.And(List.of(
+            new Predicate.LtEq(XMIN, new Value.FloatVal((float)w.maxx)),
+            new Predicate.GtEq(XMAX, new Value.FloatVal((float)w.minx)),
+            new Predicate.LtEq(YMIN, new Value.FloatVal((float)w.maxy)),
+            new Predicate.GtEq(YMAX, new Value.FloatVal((float)w.miny))));
 
         try (Stream<ParquetRecord> stream =
                  ds.read(predicate, projection, ReadOptions.DEFAULTS)) {
-            return stream.count();
+            long rows = 0; MaterializedChecksum checksum = new MaterializedChecksum();
+            for (var iterator = stream.iterator(); iterator.hasNext();) {
+                ParquetRecord record = iterator.next(); rows++;
+                if (operation.equals("materialize")) checksum.add(record.getString(ID), record.getBinary(GEOMETRY), record.isNull(XMIN) ? null : record.getFloat(XMIN), record.isNull(YMIN) ? null : record.getFloat(YMIN), record.isNull(XMAX) ? null : record.getFloat(XMAX), record.isNull(YMAX) ? null : record.getFloat(YMAX));
+            }
+            if (operation.equals("materialize")) checksum.finish();
+            return rows;
         }
     }
 
@@ -91,10 +104,10 @@ public final class ParquetryR2ConcurrentBench {
 
     public static void main(String[] a) throws Exception {
 
-        if (a.length != 9) {
+        if (a.length < 9 || a.length > 10) {
             throw new IllegalArgumentException(
                 "Expected bucket object workload endpoint region " +
-                "concurrency queries warmup scenario"
+                "concurrency queries warmup scenario [operation]"
             );
         }
 
@@ -102,6 +115,7 @@ public final class ParquetryR2ConcurrentBench {
         int queries = Integer.parseInt(a[6]);
         int warmup = Integer.parseInt(a[7]);
         String scenario = a[8];
+        String operation = a.length == 10 ? a[9] : "materialize";
 
         if (concurrency < 1 || queries < 1) {
             throw new IllegalArgumentException(
@@ -163,7 +177,7 @@ public final class ParquetryR2ConcurrentBench {
             ParquetSource ds = ParquetSource.open(bytes);
 
             Projection projection = Projection.ofPhysical(
-                List.of(
+                operation.equals("scan") ? List.of(ID) : List.of(
                     ColumnPath.of("id"),
                     ColumnPath.of("geometry"),
                     ColumnPath.of("bbox")
@@ -176,7 +190,7 @@ public final class ParquetryR2ConcurrentBench {
             if (!scenario.equals("cold")) {
                 for (int j = 0; j < warmup; j++) {
                     for (int i = 0; i < hot; i++) {
-                        count(ds, windows.get(i), projection);
+                        count(ds, windows.get(i), projection, operation);
                     }
                 }
             }
@@ -216,7 +230,7 @@ public final class ParquetryR2ConcurrentBench {
 
                     futures.add(pool.submit(() -> {
                         long q = System.nanoTime();
-                        long rows = count(ds, w, projection);
+                        long rows = count(ds, w, projection, operation);
 
                         return new Result(
                             rows,
@@ -238,14 +252,15 @@ public final class ParquetryR2ConcurrentBench {
                 Collections.sort(lat);
 
                 System.out.println(
-                    "engine,scenario,concurrency,queries,wall_ms,qps," +
+                    "engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps," +
                     "p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows"
                 );
 
                 System.out.printf(
                     Locale.ROOT,
-                    "parquetry,%s,%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.2f,%d%n",
+                    "parquetry,%s,%s,bbox-v1,%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.2f,%d%n",
                     scenario,
+                    operation,
                     concurrency,
                     queries,
                     wall,

@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 import duckdb
 
+from python.query_contract import materialized_multiset_hash
 
 parser = argparse.ArgumentParser()
 
@@ -29,6 +30,9 @@ parser.add_argument(
     "--scenario",
     choices=["cold", "warm", "mixed"],
     default="warm",
+)
+parser.add_argument(
+    "--operation", choices=["scan", "materialize"], default="materialize"
 )
 
 args = parser.parse_args()
@@ -77,8 +81,9 @@ con.execute("LOAD httpfs")
 
 configure_r2(con)
 
+selected = "id, geometry, bbox" if args.operation == "materialize" else "id"
 sql = (
-    "SELECT id, geometry, bbox "
+    f"SELECT {selected} "
     f"FROM read_parquet('s3://{args.bucket}/{args.object}') "
     "WHERE bbox.xmax >= ? "
     "AND bbox.xmin <= ? "
@@ -166,7 +171,12 @@ def query(index):
 
     elapsed_ms = (time.perf_counter_ns() - start) / 1e6
 
-    return len(result), elapsed_ms
+    checksum = (
+        materialized_multiset_hash(result)
+        if args.operation == "materialize"
+        else "not_applicable"
+    )
+    return len(result), elapsed_ms, checksum
 
 
 start = time.perf_counter()
@@ -192,13 +202,14 @@ def percentile(value):
 # ------------------------------------------------------------
 
 print(
-    "engine,scenario,concurrency,queries,wall_ms,qps,"
+    "engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps,"
     "p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows"
 )
 
 print(
     f"duckdb,"
     f"{args.scenario},"
+    f"{args.operation},bbox-v1,"
     f"{args.concurrency},"
     f"{args.queries},"
     f"{wall * 1000:.3f},"

@@ -37,15 +37,16 @@ public final class ParquetJavaR2ConcurrentBench {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 9) {
+        if (args.length < 9 || args.length > 10) {
             throw new IllegalArgumentException(
-                "Expected bucket object workload endpoint region concurrency queries warmup scenario"
+                "Expected bucket object workload endpoint region concurrency queries warmup scenario [operation]"
             );
         }
         int concurrency = Integer.parseInt(args[5]);
         int queries = Integer.parseInt(args[6]);
         int warmup = Integer.parseInt(args[7]);
         String scenario = args[8];
+        String operation = args.length == 10 ? args[9] : "materialize";
         List<Window> windows = new ArrayList<>();
         List<String> lines = Files.readAllLines(Path.of(args[2]));
         for (int i = 1; i < lines.size(); i++) {
@@ -72,13 +73,13 @@ public final class ParquetJavaR2ConcurrentBench {
         InputFile input = ParquetJavaR2ComparableBench.inputFile(
             configuration, args[0], args[1]
         );
-        MessageType projection = ParquetJavaR2ComparableBench.projection(input);
+        MessageType projection = ParquetJavaR2ComparableBench.projection(input, operation);
         int hot = Math.min(6, windows.size());
         if (!scenario.equals("cold")) {
             for (int pass = 0; pass < warmup; pass++) {
                 for (int index = 0; index < hot; index++) {
                     Window window = windows.get(index);
-                    count(input, projection, window);
+                    consume(input, projection, window, operation);
                 }
             }
         }
@@ -108,7 +109,7 @@ public final class ParquetJavaR2ConcurrentBench {
                 );
                 futures.add(pool.submit(() -> {
                     long queryStart = System.nanoTime();
-                    long rows = count(input, projection, window);
+                    long rows = consume(input, projection, window, operation);
                     return new Result(
                         rows,
                         (System.nanoTime() - queryStart) / 1e6
@@ -125,13 +126,14 @@ public final class ParquetJavaR2ConcurrentBench {
             double wall = (System.nanoTime() - start) / 1e6;
             Collections.sort(latencies);
             System.out.println(
-                "engine,scenario,concurrency,queries,wall_ms,qps," +
+                "engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps," +
                 "p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows"
             );
             System.out.printf(
                 Locale.ROOT,
-                "parquet-java,%s,%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.2f,%d%n",
+                "parquet-java,%s,%s,bbox-v1,%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.2f,%d%n",
                 scenario,
+                operation,
                 concurrency,
                 queries,
                 wall,
@@ -162,5 +164,9 @@ public final class ParquetJavaR2ConcurrentBench {
             window.maxx(),
             window.maxy()
         );
+    }
+
+    private static long consume(InputFile input, MessageType projection, Window window, String operation) throws Exception {
+        return ParquetJavaR2ComparableBench.consume(input, projection, window.minx(), window.miny(), window.maxx(), window.maxy(), operation).rows();
     }
 }
