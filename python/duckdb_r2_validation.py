@@ -25,14 +25,20 @@ for key, value in {
 }.items():
     connection.execute(f"SET {key}=?", [value])
 connection.execute("SET s3_use_ssl=true")
-sql = f'''SELECT id FROM read_parquet('s3://{args.bucket}/{args.object}')
-WHERE bbox.xmin <= ? AND bbox.xmax >= ? AND bbox.ymin <= ? AND bbox.ymax >= ?'''
+sql = f"""SELECT id FROM read_parquet('s3://{args.bucket}/{args.object}')
+WHERE bbox.xmin <= ? AND bbox.xmax >= ? AND bbox.ymin <= ? AND bbox.ymax >= ?"""
 with open(args.workload, newline="", encoding="utf-8") as stream:
     workload = list(csv.DictReader(stream))
 for query in workload[: args.limit or None]:
+    print(f"{query['name']}\t2\t")
     values = connection.execute(
         sql,
-        [float(query["maxx"]), float(query["minx"]), float(query["maxy"]), float(query["miny"])],
+        [
+            float(query["maxx"]),
+            float(query["minx"]),
+            float(query["maxy"]),
+            float(query["miny"]),
+        ],
     ).fetchall()
     for (identifier,) in values:
-        print(f'{query["name"]}\t{1 if identifier is None else 0}\t{identifier or ""}')
+        print(f"{query['name']}\t{1 if identifier is None else 0}\t{identifier or ''}")

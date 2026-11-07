@@ -29,6 +29,9 @@ def write_reports(raw_path, output_dir, strict=True):
     with raw_path.open(newline="", encoding="utf-8") as stream:
         for row in csv.DictReader(stream):
             key = (row["dataset"], row["bbox_name"])
+            grouped[key][row["engine"]]
+            if row["id_is_null"] == "marker":
+                continue
             if row.get("error"):
                 errors[(key, row["engine"])] = row["error"]
             elif row["id_is_null"] == "true":
@@ -42,8 +45,14 @@ def write_reports(raw_path, output_dir, strict=True):
     summary_rows = []
     for key in sorted(grouped):
         dataset, bbox_name = key
-        status = "execution_error" if any((key, e) in errors for e in ENGINES) else classify(grouped[key])
-        summary_rows.append({"dataset": dataset, "bbox_name": bbox_name, "validation_status": status})
+        status = (
+            "execution_error"
+            if any((key, e) in errors for e in ENGINES)
+            else classify(grouped[key])
+        )
+        summary_rows.append(
+            {"dataset": dataset, "bbox_name": bbox_name, "validation_status": status}
+        )
         baseline = Counter(grouped[key].get(ENGINES[0], []))
         for engine in ENGINES:
             identifiers = grouped[key].get(engine, [])
@@ -55,7 +64,9 @@ def write_reports(raw_path, output_dir, strict=True):
                     "row_count": len(identifiers),
                     "id_set_hash": id_multiset_hash(identifiers),
                     "null_count": Counter(identifiers).get(None, 0),
-                    "duplicate_count": sum(max(0, n - 1) for n in Counter(identifiers).values()),
+                    "duplicate_count": sum(
+                        max(0, n - 1) for n in Counter(identifiers).values()
+                    ),
                     "validation_status": status,
                     "error": errors.get((key, engine), ""),
                 }
@@ -79,11 +90,26 @@ def write_reports(raw_path, output_dir, strict=True):
             writer.writeheader()
             writer.writerows(rows)
 
-    emit("validation-results.csv", list(result_rows[0]) if result_rows else ["dataset"], result_rows)
-    emit("validation-summary.csv", ["dataset", "bbox_name", "validation_status"], summary_rows)
+    emit(
+        "validation-results.csv",
+        list(result_rows[0]) if result_rows else ["dataset"],
+        result_rows,
+    )
+    emit(
+        "validation-summary.csv",
+        ["dataset", "bbox_name", "validation_status"],
+        summary_rows,
+    )
     emit(
         "mismatches.csv",
-        ["dataset", "bbox_name", "engine", "missing_ids", "unexpected_ids", "validation_status"],
+        [
+            "dataset",
+            "bbox_name",
+            "engine",
+            "missing_ids",
+            "unexpected_ids",
+            "validation_status",
+        ],
         mismatch_rows,
     )
     failures = sum(row["validation_status"] != "match" for row in summary_rows)

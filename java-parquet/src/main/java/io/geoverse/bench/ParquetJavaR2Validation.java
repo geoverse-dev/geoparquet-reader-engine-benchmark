@@ -28,6 +28,7 @@ public final class ParquetJavaR2Validation {
             String[] p = lines.get(i).split(",");
             if (p.length < 5) continue;
             FilterPredicate predicate = and(and(ltEq(floatColumn("bbox.xmin"), Float.parseFloat(p[3])), gtEq(floatColumn("bbox.xmax"), Float.parseFloat(p[1]))), and(ltEq(floatColumn("bbox.ymin"), Float.parseFloat(p[4])), gtEq(floatColumn("bbox.ymax"), Float.parseFloat(p[2]))));
+            System.out.printf("%s\t2\t%n", p[0]);
             ParquetReader.Builder<Group> builder = new ParquetReader.Builder<>(input) { protected ReadSupport<Group> getReadSupport() { return new GroupReadSupport(); } };
             try (ParquetReader<Group> reader = builder.withFilter(FilterCompat.get(predicate)).set(ReadSupport.PARQUET_READ_SCHEMA, ParquetJavaR2ComparableBench.readSchema(projection)).build()) {
                 Group group;
