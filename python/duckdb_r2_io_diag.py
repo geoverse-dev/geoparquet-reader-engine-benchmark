@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
-import argparse, csv, os, time, sys
+import argparse
+import csv
+import os
+import time
 from urllib.parse import urlparse
+
 import duckdb
 
 p = argparse.ArgumentParser()
@@ -33,10 +37,10 @@ sql = f"""
 SELECT "id", "geometry", "bbox"
 FROM read_parquet('{uri}')
 WHERE (
-    "bbox".xmax >= ?
-    AND "bbox".xmin <= ?
-    AND "bbox".ymax >= ?
-    AND "bbox".ymin <= ?
+    "bbox".xmax >= CAST(? AS REAL)
+    AND "bbox".xmin <= CAST(? AS REAL)
+    AND "bbox".ymax >= CAST(? AS REAL)
+    AND "bbox".ymin <= CAST(? AS REAL)
 )
 """
 params = [float(r["minx"]), float(r["maxx"]), float(r["miny"]), float(r["maxy"])]

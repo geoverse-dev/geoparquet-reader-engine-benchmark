@@ -4,10 +4,12 @@ import csv
 import os
 import sys
 import time
+from pathlib import Path
 from urllib.parse import urlparse
 
 import duckdb
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from python.cache_profile import apply_duckdb_profile
 from python.query_contract import materialized_multiset_hash
 
@@ -51,7 +53,8 @@ if a.limit:
     rows = rows[: a.limit]
 selected = '"id","geometry","bbox"' if a.operation == "materialize" else '"id"'
 sql = f"""SELECT {selected} FROM read_parquet('{uri}')
-WHERE ("bbox".xmax >= ? AND "bbox".xmin <= ? AND "bbox".ymax >= ? AND "bbox".ymin <= ?)"""
+WHERE ("bbox".xmax >= CAST(? AS REAL) AND "bbox".xmin <= CAST(? AS REAL)
+AND "bbox".ymax >= CAST(? AS REAL) AND "bbox".ymin <= CAST(? AS REAL))"""
 
 
 def run(emit):

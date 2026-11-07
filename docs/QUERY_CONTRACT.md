@@ -15,6 +15,11 @@ must not claim this contract until their conformance tests pass.
 Query boxes are required to contain finite coordinates and to satisfy
 `minx <= maxx` and `miny <= maxy`.
 
+Before comparison, each query coordinate is rounded once to IEEE-754 binary32,
+matching the physical `FLOAT` type of the four stored BBOX leaves. DuckDB uses
+`CAST(? AS REAL)`; both Java readers use `float`. This avoids engine-dependent
+boundary results caused by comparing a physical float against an unrounded double.
+
 ### Predicate
 
 A feature matches when all four ordered comparisons are true:

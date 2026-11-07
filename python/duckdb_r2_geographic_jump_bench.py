@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-import argparse, csv, os, time, duckdb
+import argparse
+import csv
+import os
+import time
+
+import duckdb
 
 p = argparse.ArgumentParser()
 for x in ["bucket", "object", "workload", "endpoint"]:
@@ -34,7 +39,8 @@ print(
 )
 for pos, r in enumerate(workload, 1):
     sql = f"""SELECT "id","geometry","bbox" FROM read_parquet('{uri}')
-WHERE ("bbox".xmax >= ? AND "bbox".xmin <= ? AND "bbox".ymax >= ? AND "bbox".ymin <= ?)"""
+WHERE ("bbox".xmax >= CAST(? AS REAL) AND "bbox".xmin <= CAST(? AS REAL)
+AND "bbox".ymax >= CAST(? AS REAL) AND "bbox".ymin <= CAST(? AS REAL))"""
     params = [float(r["minx"]), float(r["maxx"]), float(r["miny"]), float(r["maxy"])]
     con.execute("CALL truncate_duckdb_logs()")
     t = time.perf_counter()

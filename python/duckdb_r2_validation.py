@@ -26,7 +26,8 @@ for key, value in {
     connection.execute(f"SET {key}=?", [value])
 connection.execute("SET s3_use_ssl=true")
 sql = f"""SELECT id FROM read_parquet('s3://{args.bucket}/{args.object}')
-WHERE bbox.xmin <= ? AND bbox.xmax >= ? AND bbox.ymin <= ? AND bbox.ymax >= ?"""
+WHERE bbox.xmin <= CAST(? AS REAL) AND bbox.xmax >= CAST(? AS REAL)
+  AND bbox.ymin <= CAST(? AS REAL) AND bbox.ymax >= CAST(? AS REAL)"""
 with open(args.workload, newline="", encoding="utf-8") as stream:
     workload = list(csv.DictReader(stream))
 for query in workload[: args.limit or None]:

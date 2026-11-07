@@ -5,7 +5,8 @@ import struct
 
 CONTRACT_VERSION = "bbox-v1"
 BBOX_SQL_PREDICATE = (
-    "bbox.xmin <= ? AND bbox.xmax >= ? AND bbox.ymin <= ? AND bbox.ymax >= ?"
+    "bbox.xmin <= CAST(? AS REAL) AND bbox.xmax >= CAST(? AS REAL) "
+    "AND bbox.ymin <= CAST(? AS REAL) AND bbox.ymax >= CAST(? AS REAL)"
 )
 
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-import argparse, csv, os, time
+import argparse
+import csv
+import os
+import time
+
 import duckdb
 
 p = argparse.ArgumentParser()
@@ -43,8 +47,8 @@ for pos, row in enumerate(workload[: max(wanted)], 1):
     sql = f"""
 SELECT "id","geometry","bbox"
 FROM read_parquet('{uri}')
-WHERE ("bbox".xmax >= ? AND "bbox".xmin <= ?
-   AND "bbox".ymax >= ? AND "bbox".ymin <= ?)
+WHERE ("bbox".xmax >= CAST(? AS REAL) AND "bbox".xmin <= CAST(? AS REAL)
+   AND "bbox".ymax >= CAST(? AS REAL) AND "bbox".ymin <= CAST(? AS REAL))
 """
     params = [
         float(row["minx"]),

@@ -60,6 +60,9 @@ class QueryContractFixtureTest(unittest.TestCase):
     def test_same_count_with_different_ids_has_different_hash(self):
         self.assertNotEqual(id_multiset_hash(["a", "b"]), id_multiset_hash(["a", "c"]))
 
+    def test_duckdb_predicate_rounds_query_coordinates_to_physical_float(self):
+        self.assertEqual(4, BBOX_SQL_PREDICATE.count("CAST(? AS REAL)"))
+
     def test_materialized_hash_consumes_geometry_bbox_and_is_order_independent(self):
         bbox = {"xmin": 1.0, "ymin": 2.0, "xmax": 3.0, "ymax": 4.0}
         rows = [("a", b"wkb-a", bbox), (None, b"wkb-b", None)]

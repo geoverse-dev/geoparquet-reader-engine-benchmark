@@ -58,8 +58,8 @@ def main():
         sql = f"""
         SELECT id, geometry, bbox
         FROM read_parquet('{args.url}')
-        WHERE bbox.xmax >= ? AND bbox.xmin <= ?
-          AND bbox.ymax >= ? AND bbox.ymin <= ?
+        WHERE bbox.xmax >= CAST(? AS REAL) AND bbox.xmin <= CAST(? AS REAL)
+          AND bbox.ymax >= CAST(? AS REAL) AND bbox.ymin <= CAST(? AS REAL)
         """
         params = [
             float(q["minx"]),
