@@ -5,6 +5,9 @@ WORKLOAD="${WORKLOAD:-config/workload-persistent.csv}"
 WARMUPS="${WARMUPS:-2}"
 LIMIT="${LIMIT:-0}"
 PARQUETRY_CACHE="${PARQUETRY_CACHE:-on}"
+OPERATION="${OPERATION:-materialize}"
+QUERY_CONTRACT="bbox-v1"
+case "$OPERATION" in scan|materialize) ;; *) echo "OPERATION must be scan or materialize" >&2; exit 2;; esac
 
 case "$PARQUETRY_CACHE" in
 on)
@@ -51,7 +54,7 @@ fi
 
 CP="java/target/classes:$(cat java/target/classpath.txt)"
 PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
-HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,query,rows,elapsed_ms,remote_range_calls,remote_bytes_requested,remote_bytes_returned'
+HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,remote_range_calls,remote_bytes_requested,remote_bytes_returned'
 echo "$HEADER" >"$OUT"
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
@@ -64,20 +67,21 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 		--object "$object" \
 		--workload "$WORKLOAD" \
 		--warmups "$WARMUPS" \
-		--limit "$LIMIT" |
+		--limit "$LIMIT" --operation "$OPERATION" |
 		awk -F, \
 			-v layout="$layout" \
 			-v benchmark_mode="$BENCHMARK_MODE" \
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
-			'{print layout",duckdb,DuckDB default,"benchmark_mode",duckdb_default,"lifecycle","warmups","$0",,,"}' >>"$OUT"
+			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
+			'{print layout",duckdb,DuckDB default,"benchmark_mode",duckdb_default,"lifecycle","warmups","operation","contract","$0",,,"}' >>"$OUT"
 
 	echo "$PARQUETRY_CONFIG: $layout"
 	java --enable-preview --enable-native-access=ALL-UNNAMED \
 		-cp "$CP" \
 		io.geoverse.bench.ParquetryR2ComparableBench \
 		"$R2_BUCKET" "$object" "$WORKLOAD" "$WARMUPS" \
-		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" "$PARQUETRY_CACHE" |
+		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" "$PARQUETRY_CACHE" "$OPERATION" |
 		awk -F, \
 			-v layout="$layout" \
 			-v reader_config="$PARQUETRY_CONFIG" \
@@ -85,14 +89,15 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v cache_mode="$PARQUETRY_ROW_CACHE_MODE" \
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
-			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","$0}' >>"$OUT"
+			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
+			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0}' >>"$OUT"
 
 	echo "$PARQUET_JAVA_CONFIG: $layout"
 	"$PARQUET_JAVA_BIN" \
 		-cp "$PARQUET_JAVA_CP" \
 		io.geoverse.bench.ParquetJavaR2ComparableBench \
 		"$R2_BUCKET" "$object" "$WORKLOAD" "$WARMUPS" \
-		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" |
+		"$R2_ENDPOINT" "$R2_REGION" "$LIMIT" "$OPERATION" |
 		awk -F, \
 			-v layout="$layout" \
 			-v reader_config="$PARQUET_JAVA_CONFIG" \
@@ -100,7 +105,8 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v cache_mode="$PARQUET_JAVA_ROW_CACHE_MODE" \
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
-			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","$0}' >>"$OUT"
+			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
+			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0}' >>"$OUT"
 done
 
 uv run --frozen python scripts/report-r2-comparable.py "$OUT" "$SUMMARY"

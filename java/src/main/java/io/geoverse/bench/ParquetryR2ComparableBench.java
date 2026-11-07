@@ -1,12 +1,10 @@
 package io.geoverse.bench;
 
-import static io.tileverse.parquetry.filter.Pred.col;
-
 import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetSource;
-import io.tileverse.parquetry.filter.Bbox;
 import io.tileverse.parquetry.filter.Predicate;
 import io.tileverse.parquetry.filter.Projection;
+import io.tileverse.parquetry.filter.Value;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
@@ -30,6 +28,13 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 
 public final class ParquetryR2ComparableBench {
+    private static final ColumnPath ID = ColumnPath.of("id");
+    private static final ColumnPath GEOMETRY = ColumnPath.of("geometry");
+    private static final ColumnPath XMIN = ColumnPath.of("bbox", "xmin");
+    private static final ColumnPath YMIN = ColumnPath.of("bbox", "ymin");
+    private static final ColumnPath XMAX = ColumnPath.of("bbox", "xmax");
+    private static final ColumnPath YMAX = ColumnPath.of("bbox", "ymax");
+    record QueryResult(long rows, String checksum) {}
 
     private static final class CountingRangeReader implements RangeReader {
         private final RangeReader delegate;
@@ -96,9 +101,9 @@ public final class ParquetryR2ComparableBench {
     }
 
     public static void main(String[] args) throws Exception {
-        if (args.length < 7 || args.length > 8) {
+        if (args.length < 7 || args.length > 9) {
             throw new IllegalArgumentException(
-                "BUCKET OBJECT WORKLOAD WARMUPS ENDPOINT REGION LIMIT [CACHE_MODE:on|off]"
+                "BUCKET OBJECT WORKLOAD WARMUPS ENDPOINT REGION LIMIT [CACHE_MODE:on|off] [OPERATION]"
             );
         }
 
@@ -110,6 +115,9 @@ public final class ParquetryR2ComparableBench {
         String region = args[5];
         int limit = Integer.parseInt(args[6]);
         String cacheMode = args.length == 8 ? args[7] : "on";
+        if (args.length >= 8) cacheMode = args[7];
+        String operation = args.length == 9 ? args[8] : "materialize";
+        if (!operation.equals("scan") && !operation.equals("materialize")) throw new IllegalArgumentException("OPERATION must be scan or materialize");
 
         if (!cacheMode.equals("on") && !cacheMode.equals("off")) {
             throw new IllegalArgumentException("CACHE_MODE must be on or off");
@@ -158,9 +166,9 @@ public final class ParquetryR2ComparableBench {
                 );
                 List<String> lines = Files.readAllLines(workload);
                 for (int i = 0; i < warmups; i++) {
-                    run(dataset, lines, false, limit, physical);
+                    run(dataset, lines, false, limit, physical, operation);
                 }
-                run(dataset, lines, true, limit, physical);
+                run(dataset, lines, true, limit, physical, operation);
             }
         }
     }
@@ -170,10 +178,11 @@ public final class ParquetryR2ComparableBench {
         List<String> lines,
         boolean emit,
         int limit,
-        CountingRangeReader physical
+        CountingRangeReader physical,
+        String operation
     ) throws Exception {
         Projection projection = Projection.ofPhysical(
-            List.of(
+            operation.equals("scan") ? List.of(ID) : List.of(
                 ColumnPath.of("id"),
                 ColumnPath.of("geometry"),
                 ColumnPath.of("bbox")
@@ -188,17 +197,15 @@ public final class ParquetryR2ComparableBench {
             if (parts.length < 5) {
                 continue;
             }
-            Predicate predicate = col("geometry").bboxIntersects(
-                Bbox.of2d(
-                    Double.parseDouble(parts[1]),
-                    Double.parseDouble(parts[2]),
-                    Double.parseDouble(parts[3]),
-                    Double.parseDouble(parts[4])
-                )
-            );
+            Predicate predicate = new Predicate.And(List.of(
+                new Predicate.LtEq(XMIN, new Value.FloatVal(Float.parseFloat(parts[3]))),
+                new Predicate.GtEq(XMAX, new Value.FloatVal(Float.parseFloat(parts[1]))),
+                new Predicate.LtEq(YMIN, new Value.FloatVal(Float.parseFloat(parts[4]))),
+                new Predicate.GtEq(YMAX, new Value.FloatVal(Float.parseFloat(parts[2])))));
             physical.reset();
             long queryStart = System.nanoTime();
-            long rows;
+            long rows = 0;
+            MaterializedChecksum checksum = new MaterializedChecksum();
             try (
                 Stream<ParquetRecord> stream = dataset.read(
                     predicate,
@@ -206,16 +213,25 @@ public final class ParquetryR2ComparableBench {
                     ReadOptions.DEFAULTS
                 )
             ) {
-                rows = stream.count();
+                for (var iterator = stream.iterator(); iterator.hasNext();) {
+                    ParquetRecord record = iterator.next(); rows++;
+                    if (operation.equals("materialize")) checksum.add(
+                        record.getString(ID), record.getBinary(GEOMETRY),
+                        record.isNull(XMIN) ? null : record.getFloat(XMIN),
+                        record.isNull(YMIN) ? null : record.getFloat(YMIN),
+                        record.isNull(XMAX) ? null : record.getFloat(XMAX),
+                        record.isNull(YMAX) ? null : record.getFloat(YMAX));
+                }
             }
             double elapsedMs = (System.nanoTime() - queryStart) / 1e6;
             if (emit) {
                 System.out.printf(
                     Locale.ROOT,
-                    "%s,%d,%.6f,%d,%d,%d%n",
+                    "%s,%d,%.6f,%s,%d,%d,%d%n",
                     parts[0],
                     rows,
                     elapsedMs,
+                    operation.equals("materialize") ? checksum.finish() : "not_applicable",
                     physical.calls(),
                     physical.requestedBytes(),
                     physical.returnedBytes()

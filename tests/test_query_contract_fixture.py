@@ -4,7 +4,12 @@ from pathlib import Path
 
 import duckdb
 
-from python.query_contract import BBOX_SQL_PREDICATE, CONTRACT_VERSION, id_multiset_hash
+from python.query_contract import (
+    BBOX_SQL_PREDICATE,
+    CONTRACT_VERSION,
+    id_multiset_hash,
+    materialized_multiset_hash,
+)
 from tests.fixtures.generate_query_contract_fixture import generate
 
 
@@ -54,6 +59,17 @@ class QueryContractFixtureTest(unittest.TestCase):
 
     def test_same_count_with_different_ids_has_different_hash(self):
         self.assertNotEqual(id_multiset_hash(["a", "b"]), id_multiset_hash(["a", "c"]))
+
+    def test_materialized_hash_consumes_geometry_bbox_and_is_order_independent(self):
+        bbox = {"xmin": 1.0, "ymin": 2.0, "xmax": 3.0, "ymax": 4.0}
+        rows = [("a", b"wkb-a", bbox), (None, b"wkb-b", None)]
+        self.assertEqual(
+            materialized_multiset_hash(rows), materialized_multiset_hash(reversed(rows))
+        )
+        changed = [("a", b"changed", bbox), (None, b"wkb-b", None)]
+        self.assertNotEqual(
+            materialized_multiset_hash(rows), materialized_multiset_hash(changed)
+        )
 
 
 if __name__ == "__main__":

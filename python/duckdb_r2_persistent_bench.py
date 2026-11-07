@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
-import argparse, csv, os, time, sys
+import argparse
+import csv
+import os
+import sys
+import time
 from urllib.parse import urlparse
+
 import duckdb
+
+from python.query_contract import materialized_multiset_hash
 
 p = argparse.ArgumentParser()
 p.add_argument("--bucket", required=True)
@@ -9,6 +16,7 @@ p.add_argument("--object", required=True)
 p.add_argument("--workload", required=True)
 p.add_argument("--warmups", type=int, default=2)
 p.add_argument("--limit", type=int, default=0)
+p.add_argument("--operation", choices=["scan", "materialize"], default="materialize")
 a = p.parse_args()
 u = urlparse(os.environ["R2_ENDPOINT"])
 host = u.netloc or u.path
@@ -34,7 +42,8 @@ with open(a.workload, newline="") as f:
     rows = list(csv.DictReader(f))
 if a.limit:
     rows = rows[: a.limit]
-sql = f"""SELECT "id","geometry","bbox" FROM read_parquet('{uri}')
+selected = '"id","geometry","bbox"' if a.operation == "materialize" else '"id"'
+sql = f"""SELECT {selected} FROM read_parquet('{uri}')
 WHERE ("bbox".xmax >= ? AND "bbox".xmin <= ? AND "bbox".ymax >= ? AND "bbox".ymin <= ?)"""
 
 
@@ -45,9 +54,14 @@ def run(emit):
             sql,
             [float(r["minx"]), float(r["maxx"]), float(r["miny"]), float(r["maxy"])],
         ).fetchall()
+        checksum = (
+            materialized_multiset_hash(out)
+            if a.operation == "materialize"
+            else "not_applicable"
+        )
         ms = (time.perf_counter_ns() - q0) / 1e6
         if emit:
-            print(f"{r['name']},{len(out)},{ms:.6f}")
+            print(f"{r['name']},{len(out)},{ms:.6f},{checksum}")
 
 
 for _ in range(a.warmups):
