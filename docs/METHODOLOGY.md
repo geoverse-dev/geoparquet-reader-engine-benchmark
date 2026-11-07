@@ -73,6 +73,12 @@ configuration, and available R2 object size/ETag/version/checksum metadata. ETag
 are explicitly not treated as content hashes. Failed object metadata lookup is
 recorded as `not_available`; credentials and environment secrets are never copied.
 
+Concurrent engine processes are retried up to `RUN_RETRIES=3` when a process
+fails, for example because a remote range response is truncated. A retry restarts
+the complete engine/concurrency measurement in a fresh process; partial output and
+timings from failed attempts are discarded. The successful attempt number is
+recorded as `execution_attempt`. Exhausting the limit still fails the run.
+
 - `results/reference` contains outputs from the original uploaded archive; these are **historical data**, not results from this repackaging.
 - No Cloudflare R2 credentials are included.
 - The R2 API endpoint requires valid credentials; the public r2.dev links are for downloading and can be throttled.
