@@ -124,7 +124,7 @@ public final class ParquetJavaR2ComparableBench {
         try (
             ParquetReader<Group> reader = builder
                 .withFilter(FilterCompat.get(predicate))
-                .set(ReadSupport.PARQUET_READ_SCHEMA, projection.toString())
+                .set(ReadSupport.PARQUET_READ_SCHEMA, readSchema(projection))
                 .build()
         ) {
             while (reader.read() != null) {
@@ -132,6 +132,19 @@ public final class ParquetJavaR2ComparableBench {
             }
         }
         return rows;
+    }
+
+    /**
+     * parquet-java 1.17's textual schema parser only accepts the original
+     * one-argument GEOMETRY annotation. GeoParquet 2.0 stores the extended
+     * six-argument form. The annotation is metadata, so remove it only from
+     * the requested read schema while retaining the physical binary column.
+     */
+    static String readSchema(MessageType projection) {
+        return projection.toString().replaceAll(
+            "(?i)\\s+\\(GEOMETRY\\([^;\\r\\n]*\\)\\)(?=;)",
+            ""
+        );
     }
 
     private static void run(
