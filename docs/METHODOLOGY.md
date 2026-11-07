@@ -65,6 +65,14 @@ The Tileverse cache is a byte-range cache **below** the reader, not GeoWebCache 
 
 ## Provenance and reproducibility caveats
 
+Each main sequential, concurrent, or memory execution writes
+`results/run-metadata.json` and an immutable timestamped copy under
+`results/manifests/`. The manifest includes full benchmark and Parquetry Git SHAs,
+reader/runtime versions, workload SHA-256, operation/scenario counts, cache
+configuration, and available R2 object size/ETag/version/checksum metadata. ETags
+are explicitly not treated as content hashes. Failed object metadata lookup is
+recorded as `not_available`; credentials and environment secrets are never copied.
+
 - `results/reference` contains outputs from the original uploaded archive; these are **historical data**, not results from this repackaging.
 - No Cloudflare R2 credentials are included.
 - The R2 API endpoint requires valid credentials; the public r2.dev links are for downloading and can be throttled.

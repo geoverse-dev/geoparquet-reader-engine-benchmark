@@ -58,6 +58,15 @@ PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath
 HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,delegate_read_calls,delegate_bytes_requested,delegate_bytes_returned,cache_enabled,cache_implementation,cache_capacity_bytes,cache_configuration,http_requests,network_bytes_transferred'
 echo "$HEADER" >"$OUT"
 
+query_count="$LIMIT"
+if [[ "$query_count" == 0 ]]; then query_count="$(($(wc -l <"$WORKLOAD") - 1))"; fi
+uv run --frozen python scripts/generate_run_metadata.py \
+	--workload "$WORKLOAD" --bucket "$R2_BUCKET" --endpoint "$R2_ENDPOINT" \
+	--object raw.parquet --object optimized-v1.1.parquet --object optimized-v2.0.parquet \
+	--operation "$OPERATION" --scenario sequential --concurrency 1 \
+	--query-count "$query_count" --warmup-count "$WARMUPS" \
+	--cache-configuration "duckdb=$DUCKDB_PROFILE;parquetry=$PARQUETRY_CACHE;parquet-java=s3a_default"
+
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
 	layout="${spec%%:*}"
 	object="${spec#*:}"

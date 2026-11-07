@@ -44,6 +44,11 @@ done
 TMP_OUT="$(mktemp "${OUT}.tmp.XXXXXX")"
 trap 'rm -f "$TMP_OUT"' EXIT
 printf '%s\n' 'engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps,p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows,cache_profile,cache_implementation,sampling_interval_ms' >"$TMP_OUT"
+uv run --frozen python scripts/generate_run_metadata.py \
+	--workload "$WORKLOAD" --bucket "$R2_BUCKET" --endpoint "$R2_ENDPOINT" --object "$OBJECT" \
+	--operation "$OPERATION" --scenario "$SCENARIO" --concurrency "$LEVELS" \
+	--query-count "$QUERIES" --warmup-count "$WARMUP" \
+	--cache-configuration "duckdb=$DUCKDB_PROFILE;parquetry=tileverse_on;parquet-java=s3a_default"
 for level in $LEVELS; do
 	for engine in duckdb parquetry parquet-java; do
 		echo "Running $engine scenario=$SCENARIO concurrency=$level queries=$QUERIES" >&2
