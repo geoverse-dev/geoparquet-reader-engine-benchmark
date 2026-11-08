@@ -81,6 +81,11 @@ duplicate count; a hash alone is not sufficient diagnostic output.
 The sequential, concurrent, and validation implementations must refer to the same
 contract version and predicate construction code within each language.
 
+DuckDB must run with `enable_geoparquet_conversion=false` for `materialize` so
+that `geometry` remains the physical Parquet binary value. Hashing DuckDB's logical
+`GEOMETRY` representation or a reserialized `ST_AsWKB` value is not equivalent to
+consuming the stored WKB bytes used by Parquetry and parquet-java.
+
 ### Local conformance check
 
 After `make build`, run:

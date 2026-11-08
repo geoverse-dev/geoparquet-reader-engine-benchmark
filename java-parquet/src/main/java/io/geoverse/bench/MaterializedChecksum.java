@@ -35,7 +35,8 @@ final class MaterializedChecksum {
         catch (java.security.NoSuchAlgorithmException impossible) { throw new AssertionError(impossible); }
         rows.sort(MaterializedChecksum::compareUnsigned);
         for (byte[] row : rows) {
-            digest.update(new byte[] {(byte)(row.length >>> 56), (byte)(row.length >>> 48), (byte)(row.length >>> 40), (byte)(row.length >>> 32), (byte)(row.length >>> 24), (byte)(row.length >>> 16), (byte)(row.length >>> 8), (byte)row.length});
+            long length = row.length;
+            digest.update(new byte[] {(byte)(length >>> 56), (byte)(length >>> 48), (byte)(length >>> 40), (byte)(length >>> 32), (byte)(length >>> 24), (byte)(length >>> 16), (byte)(length >>> 8), (byte)length});
             digest.update(row);
         }
         return HexFormat.of().formatHex(digest.digest());

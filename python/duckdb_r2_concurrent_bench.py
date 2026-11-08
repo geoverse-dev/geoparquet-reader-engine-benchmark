@@ -83,6 +83,7 @@ con = duckdb.connect(":memory:")
 
 con.execute("INSTALL httpfs")
 con.execute("LOAD httpfs")
+con.execute("SET enable_geoparquet_conversion=false")
 
 configure_r2(con)
 apply_duckdb_profile(con, args.profile)
