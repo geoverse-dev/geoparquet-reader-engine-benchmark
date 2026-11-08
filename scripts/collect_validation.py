@@ -15,6 +15,18 @@ with (
 ):
     writer = csv.writer(target)
     for line in source:
-        name, is_null, identifier = line.rstrip("\n").split("\t", 2)
-        marker = "marker" if is_null == "2" else ("true" if is_null == "1" else "false")
-        writer.writerow([args.dataset, name, args.engine, identifier, marker, ""])
+        name, row_count, id_hash, null_count, duplicate_count, error = line.rstrip(
+            "\n"
+        ).split("\t", 5)
+        writer.writerow(
+            [
+                args.dataset,
+                name,
+                args.engine,
+                row_count,
+                id_hash,
+                null_count,
+                duplicate_count,
+                error,
+            ]
+        )

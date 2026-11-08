@@ -49,11 +49,12 @@ public final class ParquetryR2Validation {
                     new Predicate.GtEq(XMAX, new Value.FloatVal(Float.parseFloat(p[1]))),
                     new Predicate.LtEq(YMIN, new Value.FloatVal(Float.parseFloat(p[4]))),
                     new Predicate.GtEq(YMAX, new Value.FloatVal(Float.parseFloat(p[2])))));
-                System.out.printf("%s\t2\t%n", p[0]);
+                CanonicalIdSummary summary = new CanonicalIdSummary();
                 try (Stream<ParquetRecord> records = dataset.read(predicate, Projection.ofPhysical(List.of(ID)), ReadOptions.DEFAULTS)) {
-                    String name = p[0];
-                    records.forEach(record -> { String id = record.getString(ID); System.out.printf("%s\t%d\t%s%n", name, id == null ? 1 : 0, id == null ? "" : id); });
+                    records.forEach(record -> summary.add(record.getString(ID)));
                 }
+                CanonicalIdSummary.Result result = summary.finish();
+                System.out.printf("%s\t%d\t%s\t%d\t%d\t%n", p[0], result.rowCount(), result.hash(), result.nullCount(), result.duplicateCount());
                 done++;
             }
         }

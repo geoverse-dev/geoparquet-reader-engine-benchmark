@@ -5,93 +5,90 @@ from pathlib import Path
 
 from scripts.validate_results import write_reports
 
+ENGINES = ("duckdb", "parquetry", "parquet-java")
+
 
 class ValidationReportTest(unittest.TestCase):
     def write_raw(self, root, rows):
         path = root / "raw.csv"
+        fields = [
+            "dataset",
+            "bbox_name",
+            "engine",
+            "row_count",
+            "id_set_hash",
+            "null_count",
+            "duplicate_count",
+            "error",
+        ]
         with path.open("w", newline="") as stream:
-            writer = csv.DictWriter(
-                stream,
-                fieldnames=[
-                    "dataset",
-                    "bbox_name",
-                    "engine",
-                    "id",
-                    "id_is_null",
-                    "error",
-                ],
-            )
+            writer = csv.DictWriter(stream, fieldnames=fields)
             writer.writeheader()
             writer.writerows(rows)
         return path
 
-    def test_order_does_not_matter_and_duplicates_do(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            rows = []
-            for engine, ids in {
-                "duckdb": ["a", "b", "b"],
-                "parquetry": ["b", "a", "b"],
-                "parquet-java": ["a", "b"],
-            }.items():
-                rows.extend(
-                    {
-                        "dataset": "d",
-                        "bbox_name": "q",
-                        "engine": engine,
-                        "id": value,
-                        "id_is_null": "false",
-                        "error": "",
-                    }
-                    for value in ids
-                )
-            with self.assertRaises(SystemExit):
-                write_reports(self.write_raw(root, rows), root / "out")
-            summary = list(csv.DictReader((root / "out/validation-summary.csv").open()))
-            self.assertEqual("row_count_mismatch", summary[0]["validation_status"])
+    def rows(self, **overrides):
+        base = {
+            "dataset": "d",
+            "bbox_name": "q",
+            "row_count": 2,
+            "id_set_hash": "abc",
+            "null_count": 0,
+            "duplicate_count": 0,
+            "error": "",
+        }
+        return [
+            {**base, "engine": engine, **overrides.get(engine, {})}
+            for engine in ENGINES
+        ]
 
-    def test_same_count_different_ids_is_reported(self):
+    def status(self, root):
+        return next(csv.DictReader((root / "out/validation-summary.csv").open()))[
+            "validation_status"
+        ]
+
+    def test_matching_compact_summaries(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            rows = []
-            for engine, value in {
-                "duckdb": "a",
-                "parquetry": "b",
-                "parquet-java": "a",
-            }.items():
-                rows.append(
-                    {
-                        "dataset": "d",
-                        "bbox_name": "q",
-                        "engine": engine,
-                        "id": value,
-                        "id_is_null": "false",
-                        "error": "",
-                    }
-                )
-            write_reports(self.write_raw(root, rows), root / "out", strict=False)
-            summary = list(csv.DictReader((root / "out/validation-summary.csv").open()))
-            self.assertEqual(
-                "id_multiplicity_mismatch", summary[0]["validation_status"]
+            write_reports(self.write_raw(root, self.rows()), root / "out")
+            self.assertEqual("match", self.status(root))
+
+    def test_same_count_different_hash_is_reported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_reports(
+                self.write_raw(root, self.rows(parquetry={"id_set_hash": "other"})),
+                root / "out",
+                strict=False,
             )
+            self.assertEqual("id_multiplicity_mismatch", self.status(root))
 
-    def test_all_empty_query_is_retained_and_matches(self):
+    def test_duplicate_and_null_differences_are_distinguished(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            rows = [
-                {
-                    "dataset": "d",
-                    "bbox_name": "empty",
-                    "engine": engine,
-                    "id": "",
-                    "id_is_null": "marker",
-                    "error": "",
+            with self.assertRaises(SystemExit):
+                write_reports(
+                    self.write_raw(root, self.rows(parquetry={"null_count": 1})),
+                    root / "out",
+                )
+            self.assertEqual("null_mismatch", self.status(root))
+
+    def test_all_empty_query_is_retained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            rows = self.rows(
+                **{
+                    engine: {
+                        "row_count": 0,
+                        "id_set_hash": "e3b0c442",
+                        "null_count": 0,
+                        "duplicate_count": 0,
+                    }
+                    for engine in ENGINES
                 }
-                for engine in ("duckdb", "parquetry", "parquet-java")
-            ]
+            )
             write_reports(self.write_raw(root, rows), root / "out")
-            summary = list(csv.DictReader((root / "out/validation-summary.csv").open()))
-            self.assertEqual(["match"], [row["validation_status"] for row in summary])
+            self.assertEqual("match", self.status(root))
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ STRICT="${STRICT:-on}"
 out_dir="results/validation"
 raw="$out_dir/validation-raw.csv"
 mkdir -p "$out_dir"
-printf 'dataset,bbox_name,engine,id,id_is_null,error\n' >"$raw"
+printf 'dataset,bbox_name,engine,row_count,id_set_hash,null_count,duplicate_count,error\n' >"$raw"
 
 [[ -f java/target/classpath.txt && -f java-parquet/target/classpath.txt ]] || { echo "Run make build first" >&2; exit 2; }
 parquetry_cp="java/target/classes:$(cat java/target/classpath.txt)"

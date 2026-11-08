@@ -2,9 +2,15 @@
 import argparse
 import csv
 import os
+import sys
+from collections import Counter
+from pathlib import Path
 from urllib.parse import urlparse
 
 import duckdb
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from python.query_contract import id_multiset_hash
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--bucket", required=True)
@@ -31,7 +37,6 @@ WHERE bbox.xmin <= CAST(? AS REAL) AND bbox.xmax >= CAST(? AS REAL)
 with open(args.workload, newline="", encoding="utf-8") as stream:
     workload = list(csv.DictReader(stream))
 for query in workload[: args.limit or None]:
-    print(f"{query['name']}\t2\t")
     values = connection.execute(
         sql,
         [
@@ -41,5 +46,10 @@ for query in workload[: args.limit or None]:
             float(query["miny"]),
         ],
     ).fetchall()
-    for (identifier,) in values:
-        print(f"{query['name']}\t{1 if identifier is None else 0}\t{identifier or ''}")
+    identifiers = [identifier for (identifier,) in values]
+    counts = Counter(identifiers)
+    duplicates = sum(max(0, count - 1) for count in counts.values())
+    print(
+        f"{query['name']}\t{len(identifiers)}\t{id_multiset_hash(identifiers)}\t"
+        f"{counts.get(None, 0)}\t{duplicates}\t"
+    )
