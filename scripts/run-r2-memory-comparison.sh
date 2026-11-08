@@ -21,9 +21,9 @@ uv run --frozen python scripts/generate_run_metadata.py \
 	--operation materialize --scenario memory --concurrency 1 --query-count "$query_count" \
 	--warmup-count 0 --cache-configuration "duckdb=default;parquetry=tileverse_on;parquet-java=s3a_default"
 
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,duckdb_memory_limit,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-duckdb-memory.csv
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats" >results/r2-parquetry-memory.csv
-echo "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-parquet-java-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes,rss_delta_bytes,peak_rss_bytes,duckdb_memory_limit,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-duckdb-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats" >results/r2-parquetry-memory.csv
+echo "engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms" >results/r2-parquet-java-memory.csv
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
 	layout="${spec%%:*}"

@@ -11,9 +11,9 @@ mkdir -p results
 DOUT=results/r2-geographic-jumps-duckdb.csv
 POUT=results/r2-geographic-jumps-parquetry.csv
 JOUT=results/r2-geographic-jumps-parquet-java.csv
-echo "layout,position,query,rows,elapsed_ms,http_requests,http_gets,http_heads,fs_read_ops,fs_bytes" >"$DOUT"
-echo "layout,position,query,rows,elapsed_ms,range_calls,range_bytes_requested,range_bytes_returned" >"$POUT"
-echo "layout,position,query,rows,elapsed_ms" >"$JOUT"
+echo "layout,position,query,rows,elapsed_ms,result_checksum,http_requests,http_gets,http_heads,fs_read_ops,fs_bytes" >"$DOUT"
+echo "layout,position,query,rows,elapsed_ms,result_checksum,range_calls,range_bytes_requested,range_bytes_returned" >"$POUT"
+echo "layout,position,query,rows,elapsed_ms,result_checksum" >"$JOUT"
 (cd java && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
 (cd java-parquet && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
 CP="java/target/classes:$(cat java/target/classpath.txt)"

@@ -26,25 +26,27 @@ public final class ParquetJavaR2GeographicJumpBench {
             args[1]
         );
         MessageType projection = ParquetJavaR2ComparableBench.projection(input);
-        System.out.println("position,query,rows,elapsed_ms");
+        System.out.println("position,query,rows,elapsed_ms,result_checksum");
         for (int index = 1; index < lines.size(); index++) {
             String[] fields = lines.get(index).split(",");
             long start = System.nanoTime();
-            long rows = ParquetJavaR2ComparableBench.count(
+            ParquetJavaR2ComparableBench.QueryResult result = ParquetJavaR2ComparableBench.consume(
                 input,
                 projection,
                 Double.parseDouble(fields[1]),
                 Double.parseDouble(fields[2]),
                 Double.parseDouble(fields[3]),
-                Double.parseDouble(fields[4])
+                Double.parseDouble(fields[4]),
+                "materialize"
             );
             System.out.printf(
                 Locale.ROOT,
-                "%d,%s,%d,%.6f%n",
+                "%d,%s,%d,%.6f,%s%n",
                 index,
                 fields[0],
-                rows,
-                (System.nanoTime() - start) / 1e6
+                result.rows(),
+                (System.nanoTime() - start) / 1e6,
+                result.checksum()
             );
         }
     }

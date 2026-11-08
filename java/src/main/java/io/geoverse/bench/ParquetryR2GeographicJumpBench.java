@@ -1,5 +1,4 @@
 package io.geoverse.bench;
-import static io.tileverse.parquetry.filter.Pred.col;
 import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetSource;
 import io.tileverse.parquetry.filter.*;
@@ -14,6 +13,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient;
 import java.io.IOException; import java.net.URI; import java.nio.ByteBuffer; import java.nio.file.*; import java.util.*; import java.util.concurrent.atomic.AtomicLong; import java.util.stream.Stream;
 
 public final class ParquetryR2GeographicJumpBench {
+ static final ColumnPath ID=ColumnPath.of("id"),GEOMETRY=ColumnPath.of("geometry"),XMIN=ColumnPath.of("bbox","xmin"),YMIN=ColumnPath.of("bbox","ymin"),XMAX=ColumnPath.of("bbox","xmax"),YMAX=ColumnPath.of("bbox","ymax");
  static final class CRR implements RangeReader {
   final RangeReader d; final AtomicLong calls=new AtomicLong(),req=new AtomicLong(),ret=new AtomicLong();
   CRR(RangeReader d){this.d=d;}
@@ -30,13 +30,13 @@ public final class ParquetryR2GeographicJumpBench {
       CRR rr=new CRR(st.openRangeReader(a[1])); ByteRangeSource src=ByteRangeSource.of(rr)){
    ParquetSource ds=ParquetSource.open(src);
    Projection pr=Projection.ofPhysical(List.of(ColumnPath.of("id"),ColumnPath.of("geometry"),ColumnPath.of("bbox")));
-   System.out.println("position,query,rows,elapsed_ms,range_calls,range_bytes_requested,range_bytes_returned");
+   System.out.println("position,query,rows,elapsed_ms,result_checksum,range_calls,range_bytes_requested,range_bytes_returned");
    for(int i=1;i<lines.size();i++){
     String[] x=lines.get(i).split(","); double minx=Double.parseDouble(x[1]),miny=Double.parseDouble(x[2]),maxx=Double.parseDouble(x[3]),maxy=Double.parseDouble(x[4]);
-    Predicate pred=col("geometry").bboxIntersects(Bbox.of2d(minx,miny,maxx,maxy)); rr.reset(); long t=System.nanoTime(),rows;
-    try(Stream<ParquetRecord>s=ds.read(pred,pr,ReadOptions.DEFAULTS)){rows=s.count();}
+    Predicate pred=new Predicate.And(List.of(new Predicate.LtEq(XMIN,new Value.FloatVal((float)maxx)),new Predicate.GtEq(XMAX,new Value.FloatVal((float)minx)),new Predicate.LtEq(YMIN,new Value.FloatVal((float)maxy)),new Predicate.GtEq(YMAX,new Value.FloatVal((float)miny)))); rr.reset(); long t=System.nanoTime(),rows=0; MaterializedChecksum checksum=new MaterializedChecksum();
+    try(Stream<ParquetRecord>s=ds.read(pred,pr,ReadOptions.DEFAULTS)){for(var it=s.iterator();it.hasNext();){ParquetRecord r=it.next();rows++;checksum.add(r.getString(ID),r.getBinary(GEOMETRY),r.isNull(XMIN)?null:r.getFloat(XMIN),r.isNull(YMIN)?null:r.getFloat(YMIN),r.isNull(XMAX)?null:r.getFloat(XMAX),r.isNull(YMAX)?null:r.getFloat(YMAX));}}
     double ms=(System.nanoTime()-t)/1e6;
-    System.out.printf(Locale.ROOT,"%d,%s,%d,%.6f,%d,%d,%d%n",i,x[0],rows,ms,rr.calls.get(),rr.req.get(),rr.ret.get());
+    System.out.printf(Locale.ROOT,"%d,%s,%d,%.6f,%s,%d,%d,%d%n",i,x[0],rows,ms,checksum.finish(),rr.calls.get(),rr.req.get(),rr.ret.get());
    }
   }
  }

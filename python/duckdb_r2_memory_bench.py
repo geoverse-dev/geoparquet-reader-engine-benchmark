@@ -2,9 +2,14 @@
 import argparse
 import csv
 import os
+import sys
 import time
+from pathlib import Path
 
 import duckdb
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from python.query_contract import materialized_multiset_hash
 
 
 def rss_bytes():
@@ -32,6 +37,7 @@ def main():
 
     con = duckdb.connect()
     con.execute("INSTALL httpfs; LOAD httpfs")
+    con.execute("SET enable_geoparquet_conversion=false")
     endpoint = os.environ["R2_ENDPOINT"].replace("https://", "").replace("http://", "")
     con.execute("SET s3_endpoint=?", [endpoint])
     con.execute(
@@ -49,7 +55,7 @@ def main():
 
     base_rss, _ = rss_bytes()
     print(
-        "engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,"
+        "engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes,rss_delta_bytes,peak_rss_bytes,"
         "duckdb_memory_limit,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,"
         "jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms"
     )
@@ -68,18 +74,13 @@ def main():
             float(q["maxy"]),
         ]
         t = time.perf_counter()
-        rows = 0
-        cur = con.execute(sql, params)
-        while True:
-            batch = cur.fetch_record_batch(65536)
-            # fetch_record_batch returns a RecordBatchReader in current DuckDB Python
-            for rb in batch:
-                rows += rb.num_rows
-            break
+        result = con.execute(sql, params).fetchall()
+        rows = len(result)
+        checksum = materialized_multiset_hash(result)
         ms = (time.perf_counter() - t) * 1000
         rss, peak = rss_bytes()
         print(
-            f"duckdb,{args.layout},{i},{q['name']},{rows},{ms:.6f},{rss},{rss - base_rss},{peak},"
+            f"duckdb,{args.layout},{i},{q['name']},{rows},{ms:.6f},{checksum},{rss},{rss - base_rss},{peak},"
             f"{memory_limit},not_available,not_available,not_available,not_available,not_available,"
             "not_available,not_applicable",
             flush=True,

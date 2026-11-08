@@ -63,7 +63,7 @@ public final class ParquetJavaR2MemoryBench {
         MessageType projection = ParquetJavaR2ComparableBench.projection(input);
         long baseRss = processMemory()[0];
         System.out.println(
-            "engine,layout,position,query,rows,elapsed_ms,rss_bytes," +
+            "engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes," +
             "rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes," +
             "jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms"
         );
@@ -71,24 +71,26 @@ public final class ParquetJavaR2MemoryBench {
         for (Query query : queries) {
             position++;
             long start = System.nanoTime();
-            long rows = ParquetJavaR2ComparableBench.count(
+            ParquetJavaR2ComparableBench.QueryResult result = ParquetJavaR2ComparableBench.consume(
                 input,
                 projection,
                 query.minx(),
                 query.miny(),
                 query.maxx(),
-                query.maxy()
+                query.maxy(),
+                "materialize"
             );
             long[] memory = processMemory();
             ResourceMetrics.Snapshot resources = ResourceMetrics.snapshot();
             System.out.printf(
                 Locale.ROOT,
-                "parquet-java-s3a,%s,%d,%s,%d,%.6f,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable%n",
+                "parquet-java-s3a,%s,%d,%s,%d,%.6f,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable%n",
                 args[5],
                 position,
                 query.name(),
-                rows,
+                result.rows(),
                 (System.nanoTime() - start) / 1e6,
+                result.checksum(),
                 memory[0],
                 memory[0] - baseRss,
                 memory[1],

@@ -1,11 +1,10 @@
 package io.geoverse.bench;
 
-import static io.tileverse.parquetry.filter.Pred.col;
 import io.tileverse.parquetry.data.ReadOptions;
 import io.tileverse.parquetry.dataset.ParquetSource;
-import io.tileverse.parquetry.filter.Bbox;
 import io.tileverse.parquetry.filter.Predicate;
 import io.tileverse.parquetry.filter.Projection;
+import io.tileverse.parquetry.filter.Value;
 import io.tileverse.parquetry.io.ByteRangeSource;
 import io.tileverse.parquetry.record.ParquetRecord;
 import io.tileverse.parquetry.schema.ColumnPath;
@@ -24,6 +23,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 public final class ParquetryR2MemoryBench {
+ static final ColumnPath ID=ColumnPath.of("id"),GEOMETRY=ColumnPath.of("geometry"),XMIN=ColumnPath.of("bbox","xmin"),YMIN=ColumnPath.of("bbox","ymin"),XMAX=ColumnPath.of("bbox","xmax"),YMAX=ColumnPath.of("bbox","ymax");
  record Q(String name,double minx,double miny,double maxx,double maxy){}
  static long[] procMem() throws IOException {
    long rss=0,hwm=0;
@@ -54,13 +54,13 @@ public final class ParquetryR2MemoryBench {
        ParquetSource ds=ParquetSource.open(src);
        Projection pr=Projection.ofPhysical(List.of(ColumnPath.of("id"),ColumnPath.of("geometry"),ColumnPath.of("bbox")));
        long baseRss=procMem()[0];
-       System.out.println("engine,layout,position,query,rows,elapsed_ms,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats");
+       System.out.println("engine,layout,position,query,rows,elapsed_ms,result_checksum,rss_bytes,rss_delta_bytes,peak_rss_bytes,jvm_heap_used_bytes,jvm_heap_committed_bytes,jvm_non_heap_used_bytes,jvm_direct_buffer_bytes,gc_count,gc_pause_ms,sampling_interval_ms,cache_estimated_bytes,cache_entries,cache_hits,cache_misses,cache_stats");
        int pos=0;
        for(Q q:qs){
          pos++;
-         Predicate p=col("geometry").bboxIntersects(Bbox.of2d(q.minx,q.miny,q.maxx,q.maxy));
-         long t=System.nanoTime(), rows;
-         try(Stream<ParquetRecord> s=ds.read(p,pr,ReadOptions.DEFAULTS)){ rows=s.count(); }
+         Predicate p=new Predicate.And(List.of(new Predicate.LtEq(XMIN,new Value.FloatVal((float)q.maxx)),new Predicate.GtEq(XMAX,new Value.FloatVal((float)q.minx)),new Predicate.LtEq(YMIN,new Value.FloatVal((float)q.maxy)),new Predicate.GtEq(YMAX,new Value.FloatVal((float)q.miny))));
+         long t=System.nanoTime(), rows=0; MaterializedChecksum checksum=new MaterializedChecksum();
+         try(Stream<ParquetRecord> s=ds.read(p,pr,ReadOptions.DEFAULTS)){for(var it=s.iterator();it.hasNext();){ParquetRecord r=it.next();rows++;checksum.add(r.getString(ID),r.getBinary(GEOMETRY),r.isNull(XMIN)?null:r.getFloat(XMIN),r.isNull(YMIN)?null:r.getFloat(YMIN),r.isNull(XMAX)?null:r.getFloat(XMAX),r.isNull(YMAX)?null:r.getFloat(YMAX));}}
          double ms=(System.nanoTime()-t)/1e6;
          long[] m=procMem();
          var st=cached.getCacheStats();
@@ -68,8 +68,8 @@ public final class ParquetryR2MemoryBench {
          // CacheStats API varies slightly across Tileverse versions, so emit its stable
          // string form as the final field and keep direct cache-size methods out: those
          // are package-private in current source.
-         System.out.printf(Locale.ROOT,"%s,%s,%d,%s,%d,%.6f,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable,,,,,\"%s\"%n",
-           "parquetry-cache",layout,pos,q.name,rows,ms,m[0],m[0]-baseRss,m[1],resources.heapUsed(),resources.heapCommitted(),resources.nonHeapUsed(),resources.directBufferBytes(),resources.gcCount(),resources.gcPauseMs(),st.toString().replace("\"","'"));
+         System.out.printf(Locale.ROOT,"%s,%s,%d,%s,%d,%.6f,%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,not_applicable,,,,,\"%s\"%n",
+           "parquetry-cache",layout,pos,q.name,rows,ms,checksum.finish(),m[0],m[0]-baseRss,m[1],resources.heapUsed(),resources.heapCommitted(),resources.nonHeapUsed(),resources.directBufferBytes(),resources.gcCount(),resources.gcPauseMs(),st.toString().replace("\"","'"));
        }
      }
    }
