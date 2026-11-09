@@ -55,7 +55,7 @@ fi
 
 CP="java/target/classes:$(cat java/target/classpath.txt)"
 PARQUET_JAVA_CP="java-parquet/target/classes:$(cat java-parquet/target/classpath.txt)"
-HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,delegate_read_calls,delegate_bytes_requested,delegate_bytes_returned,cache_enabled,cache_implementation,cache_capacity_bytes,cache_configuration,http_requests,network_bytes_transferred'
+HEADER='layout,reader,reader_config,benchmark_mode,cache_mode,cache_lifecycle,warmups,operation,query_contract,query,rows,elapsed_ms,result_checksum,delegate_read_calls,delegate_bytes_requested,delegate_bytes_returned,cache_enabled,cache_implementation,cache_capacity_bytes,cache_configuration,http_requests,network_bytes_transferred,read_materialize_ms,validation_ms'
 echo "$HEADER" >"$OUT"
 
 query_count="$LIMIT"
@@ -65,7 +65,7 @@ uv run --frozen python scripts/generate_run_metadata.py \
 	--object raw.parquet --object optimized-v1.1.parquet --object optimized-v2.0.parquet \
 	--operation "$OPERATION" --scenario sequential --concurrency 1 \
 	--query-count "$query_count" --warmup-count "$WARMUPS" \
-	--cache-configuration "duckdb=$DUCKDB_PROFILE;parquetry=$PARQUETRY_CACHE;parquet-java=s3a_default"
+	--cache-configuration "duckdb=$DUCKDB_PROFILE;duckdb-arrow=$DUCKDB_PROFILE;parquetry=$PARQUETRY_CACHE;parquet-java=s3a_default"
 
 for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized-v2.0:optimized-v2.0.parquet"; do
 	layout="${spec%%:*}"
@@ -84,7 +84,19 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			-v profile="$DUCKDB_PROFILE" '{print layout",duckdb,DuckDB "profile","benchmark_mode",duckdb_"profile","lifecycle","warmups","operation","contract","$0",not_available,not_available,not_available,true,duckdb_internal,not_available,"profile",not_available,not_available"}' >>"$OUT"
+			-v profile="$DUCKDB_PROFILE" '{print layout",duckdb,DuckDB "profile","benchmark_mode",duckdb_"profile","lifecycle","warmups","operation","contract","$0",not_available,not_available,not_available,true,duckdb_internal,not_available,"profile",not_available,not_available,not_available,not_available"}' >>"$OUT"
+
+	echo "DuckDB $DUCKDB_PROFILE + Arrow: $layout"
+	uv run --frozen python python/duckdb_r2_arrow_bench.py \
+		--bucket "$R2_BUCKET" --object "$object" --workload "$WORKLOAD" \
+		--warmups "$WARMUPS" --limit "$LIMIT" --operation "$OPERATION" \
+		--profile "$DUCKDB_PROFILE" |
+		awk -F, \
+			-v layout="$layout" -v benchmark_mode="$BENCHMARK_MODE" \
+			-v lifecycle="$CACHE_LIFECYCLE" -v warmups="$WARMUPS" \
+			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
+			-v profile="$DUCKDB_PROFILE" \
+			'{print layout",duckdb-arrow,DuckDB "profile" Arrow,"benchmark_mode",duckdb_"profile"_arrow,"lifecycle","warmups","operation","contract","$1","$2","$3","$4",not_available,not_available,not_available,true,duckdb_internal_arrow,not_available,"profile",not_available,not_available,"$5","$6}' >>"$OUT"
 
 	echo "$PARQUETRY_CONFIG: $layout"
 	java --enable-preview --enable-native-access=ALL-UNNAMED \
@@ -100,7 +112,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",true,tileverse_caching_range_reader,not_available,"cache_mode",not_available,not_available"}' >>"$OUT"
+			'{print layout",parquetry,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",true,tileverse_caching_range_reader,not_available,"cache_mode",not_available,not_available,not_available,not_available"}' >>"$OUT"
 
 	echo "$PARQUET_JAVA_CONFIG: $layout"
 	"$PARQUET_JAVA_BIN" \
@@ -116,7 +128,7 @@ for spec in "raw:raw.parquet" "optimized-v1.1:optimized-v1.1.parquet" "optimized
 			-v lifecycle="$CACHE_LIFECYCLE" \
 			-v warmups="$WARMUPS" \
 			-v operation="$OPERATION" -v contract="$QUERY_CONTRACT" \
-			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",not_available,hadoop_s3a_default,not_available,s3a_default,not_available,not_available"}' >>"$OUT"
+			'{print layout",parquet-java,"reader_config","benchmark_mode","cache_mode","lifecycle","warmups","operation","contract","$0",not_available,hadoop_s3a_default,not_available,s3a_default,not_available,not_available,not_available,not_available"}' >>"$OUT"
 done
 
 uv run --frozen python scripts/report-r2-comparable.py "$OUT" "$SUMMARY"

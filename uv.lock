@@ -664,12 +664,14 @@ source = { virtual = "." }
 dependencies = [
     { name = "geoparquet-io" },
     { name = "psutil" },
+    { name = "pyarrow" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "geoparquet-io", specifier = ">=0.9" },
     { name = "psutil", specifier = ">=5.9" },
+    { name = "pyarrow", specifier = ">=25.0.1" },
 ]
 
 [[package]]

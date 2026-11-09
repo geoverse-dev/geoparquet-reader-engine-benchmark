@@ -34,6 +34,8 @@ class ReportComparableTest(unittest.TestCase):
             "remote_range_calls,remote_bytes_requested,remote_bytes_returned\n"
             "raw,duckdb,DuckDB default,cache_aligned,duckdb_default,"
             "persistent_warm_session,2,small-01,10,2.0,,,\n"
+            "raw,duckdb-arrow,DuckDB default Arrow,cache_aligned,duckdb_default_arrow,"
+            "persistent_warm_session,2,small-01,10,1.2,,,\n"
             "raw,parquetry,Parquetry + Tileverse Cache,cache_aligned,"
             "tileverse_on,persistent_warm_session,2,small-01,11,1.0,2,200,180\n"
             "raw,parquet-java,parquet-java + Hadoop S3A defaults,cache_aligned,"
@@ -48,6 +50,9 @@ class ReportComparableTest(unittest.TestCase):
         parquet_java = next(row for row in rows if row["reader"] == "parquet-java")
         self.assertEqual("row_counts_match", parquet_java["validation_status"])
         self.assertEqual("s3a_default", parquet_java["cache_mode"])
+        duckdb_arrow = next(row for row in rows if row["reader"] == "duckdb-arrow")
+        self.assertEqual("row_counts_match", duckdb_arrow["validation_status"])
+        self.assertEqual("duckdb_default_arrow", duckdb_arrow["cache_mode"])
 
     def test_legacy_report_is_not_labeled_cache_aligned(self):
         process, rows = self.run_report(

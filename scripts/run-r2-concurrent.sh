@@ -49,19 +49,21 @@ done
 TMP_OUT="$(mktemp "${OUT}.tmp.XXXXXX")"
 ENGINE_OUT=""
 trap 'rm -f "$TMP_OUT" ${ENGINE_OUT:+"$ENGINE_OUT"}' EXIT
-printf '%s\n' 'engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps,p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows,cache_profile,cache_implementation,sampling_interval_ms,execution_attempt' >"$TMP_OUT"
+printf '%s\n' 'engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps,p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows,read_materialize_p50_ms,validation_p50_ms,cache_profile,cache_implementation,sampling_interval_ms,execution_attempt' >"$TMP_OUT"
 uv run --frozen python scripts/generate_run_metadata.py \
 	--workload "$WORKLOAD" --bucket "$R2_BUCKET" --endpoint "$R2_ENDPOINT" --object "$OBJECT" \
 	--operation "$OPERATION" --scenario "$SCENARIO" --concurrency "$LEVELS" \
 	--query-count "$QUERIES" --warmup-count "$WARMUP" \
-	--cache-configuration "duckdb=$DUCKDB_PROFILE;parquetry=tileverse_on;parquet-java=s3a_default"
+	--cache-configuration "duckdb=$DUCKDB_PROFILE;duckdb-arrow=$DUCKDB_PROFILE;parquetry=tileverse_on;parquet-java=s3a_default"
 for level in $LEVELS; do
-	for engine in duckdb parquetry parquet-java; do
+	for engine in duckdb duckdb-arrow parquetry parquet-java; do
 		echo "Running $engine scenario=$SCENARIO concurrency=$level queries=$QUERIES" >&2
 		ENGINE_OUT="$(mktemp)"
 		for ((attempt = 1; attempt <= RUN_RETRIES; attempt++)); do
 			if [[ "$engine" == duckdb ]]; then
 				command=(uv run --frozen python python/duckdb_r2_concurrent_bench.py --bucket "$R2_BUCKET" --object "$OBJECT" --workload "$WORKLOAD" --concurrency "$level" --queries "$QUERIES" --warmup "$WARMUP" --scenario "$SCENARIO" --operation "$OPERATION" --profile "$DUCKDB_PROFILE")
+			elif [[ "$engine" == duckdb-arrow ]]; then
+				command=(uv run --frozen python python/duckdb_r2_concurrent_bench.py --bucket "$R2_BUCKET" --object "$OBJECT" --workload "$WORKLOAD" --concurrency "$level" --queries "$QUERIES" --warmup "$WARMUP" --scenario "$SCENARIO" --operation "$OPERATION" --profile "$DUCKDB_PROFILE" --materialization arrow)
 			elif [[ "$engine" == parquetry ]]; then
 				command=(java --enable-preview --enable-native-access=ALL-UNNAMED -cp "$CP" io.geoverse.bench.ParquetryR2ConcurrentBench "$R2_BUCKET" "$OBJECT" "$WORKLOAD" "$R2_ENDPOINT" "$R2_REGION" "$level" "$QUERIES" "$WARMUP" "$SCENARIO" "$OPERATION")
 			else
@@ -76,12 +78,12 @@ for level in $LEVELS; do
 			fi
 			echo "Retrying $engine concurrency=$level after transient failure (attempt $((attempt + 1))/$RUN_RETRIES)" >&2
 		done
-		if [[ "$engine" == duckdb ]]; then
+		if [[ "$engine" == duckdb || "$engine" == duckdb-arrow ]]; then
 			tail -n +2 "$ENGINE_OUT" | awk -v profile="$DUCKDB_PROFILE" -v attempt="$attempt" '{printf "%s,%s,duckdb_internal,25,%d\n", $0, profile, attempt}' >>"$TMP_OUT"
 		elif [[ "$engine" == parquetry ]]; then
-			tail -n +2 "$ENGINE_OUT" | awk -v attempt="$attempt" '{printf "%s,tileverse_on,tileverse_caching_range_reader,25,%d\n", $0, attempt}' >>"$TMP_OUT"
+			tail -n +2 "$ENGINE_OUT" | awk -v attempt="$attempt" '{printf "%s,not_available,not_available,tileverse_on,tileverse_caching_range_reader,25,%d\n", $0, attempt}' >>"$TMP_OUT"
 		else
-			tail -n +2 "$ENGINE_OUT" | awk -v attempt="$attempt" '{printf "%s,s3a_default,hadoop_s3a_default,25,%d\n", $0, attempt}' >>"$TMP_OUT"
+			tail -n +2 "$ENGINE_OUT" | awk -v attempt="$attempt" '{printf "%s,not_available,not_available,s3a_default,hadoop_s3a_default,25,%d\n", $0, attempt}' >>"$TMP_OUT"
 		fi
 		rm -f "$ENGINE_OUT"
 		ENGINE_OUT=""

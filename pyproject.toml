@@ -4,5 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
   "geoparquet-io>=0.9",
+  "pyarrow>=25.0.1",
   "psutil>=5.9",
 ]

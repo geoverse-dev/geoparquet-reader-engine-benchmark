@@ -9,9 +9,11 @@ REGION="${AWS_REGION:-${AWS_DEFAULT_REGION:-auto}}"
 WORKLOAD="${WORKLOAD:-config/workload-geographic-jumps.csv}"
 mkdir -p results
 DOUT=results/r2-geographic-jumps-duckdb.csv
+AOUT=results/r2-geographic-jumps-duckdb-arrow.csv
 POUT=results/r2-geographic-jumps-parquetry.csv
 JOUT=results/r2-geographic-jumps-parquet-java.csv
 echo "layout,position,query,rows,elapsed_ms,result_checksum,http_requests,http_gets,http_heads,fs_read_ops,fs_bytes" >"$DOUT"
+echo "layout,position,query,rows,elapsed_ms,result_checksum,http_requests,http_gets,http_heads,fs_read_ops,fs_bytes,read_materialize_ms,validation_ms" >"$AOUT"
 echo "layout,position,query,rows,elapsed_ms,result_checksum,range_calls,range_bytes_requested,range_bytes_returned" >"$POUT"
 echo "layout,position,query,rows,elapsed_ms,result_checksum" >"$JOUT"
 (cd java && mvn -q -DskipTests package dependency:build-classpath -Dmdep.outputFile=target/classpath.txt)
@@ -24,6 +26,11 @@ run_one() {
 	tmp=$(mktemp)
 	uv run python python/duckdb_r2_geographic_jump_bench.py --bucket "$BUCKET" --object "$object" --workload "$WORKLOAD" --endpoint "$ENDPOINT" --region "$REGION" | tee "$tmp"
 	tail -n +2 "$tmp" | sed "s/^/${layout},/" >>"$DOUT"
+	rm "$tmp"
+	echo "=== $layout / duckdb-arrow ==="
+	tmp=$(mktemp)
+	uv run python python/duckdb_r2_geographic_jump_bench.py --bucket "$BUCKET" --object "$object" --workload "$WORKLOAD" --endpoint "$ENDPOINT" --region "$REGION" --materialization arrow | tee "$tmp"
+	tail -n +2 "$tmp" | sed "s/^/${layout},/" >>"$AOUT"
 	rm "$tmp"
 	echo "=== $layout / parquetry ==="
 	tmp=$(mktemp)
@@ -42,6 +49,9 @@ run_one optimized-v2.0 optimized-v2.0.parquet
 echo
 echo "DuckDB: $DOUT"
 cat "$DOUT"
+echo
+echo "DuckDB Arrow: $AOUT"
+cat "$AOUT"
 echo
 echo "Parquetry: $POUT"
 cat "$POUT"

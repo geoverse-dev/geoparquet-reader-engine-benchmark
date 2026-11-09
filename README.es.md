@@ -83,8 +83,8 @@ original, ejecute `make data`, suba los objetos a un bucket S3 propio y configur
 | `make check` | Verificar herramientas y archivos locales | Consola |
 | `make setup` | Instalar dependencias y compilar Parquetry y el benchmark | Artefactos Maven |
 | `make build` | Recompilar el benchmark Java y el snapshot upstream | `java/target/` |
-| `make smoke` | Primer BBOX, sin warmup, tres lectores y tres layouts | `results/smoke-*.csv` |
-| `make bench` | DuckDB, Parquetry y parquet-java, 150 BBOX por layout | `results/r2-comparable-*.csv` |
+| `make smoke` | Primer BBOX, sin warmup, todos los readers/configuraciones y layouts | `results/smoke-*.csv` |
+| `make bench` | DuckDB rows, DuckDB Arrow, Parquetry y parquet-java, 150 BBOX por layout | `results/r2-comparable-*.csv` |
 | `make stress-500` | Suite explícita de carga sostenida; 500 ejecuciones BBOX por engine/layout | `results/stress/r2-stress-500-*.csv` |
 | `make stress-1000` | Suite explícita de carga sostenida; 1000 ejecuciones BBOX por engine/layout | `results/stress/r2-stress-1000-*.csv` |
 | `PARQUETRY_CACHE=off make bench` | Diagnóstico de Parquetry sin cache | `results/r2-comparable-nocache-*.csv` |
@@ -141,6 +141,13 @@ garantiza que los caches del sistema operativo, red, CDN u otros caches comparti
 estén vacíos. Con uno o más warmups se etiqueta `persistent_warm_session`.
 
 ### Salidas e interpretación
+
+DuckDB Arrow es una configuración adicional de materialización, no un cuarto
+reader. Usa la misma consulta, perfil de cache, columnas proyectadas, validación
+de filas y checksum canónico que DuckDB `fetchall()`. `read_materialize_ms`
+registra ejecución y exportación Arrow, `validation_ms` registra el consumo para
+el checksum y `elapsed_ms` incluye ambos. El caso Arrow se incluye automáticamente
+en smoke, secuencial, stress, geografía, memoria y concurrencia.
 
 `results/r2-comparable-runs.csv` registra configuración del lector, modo del
 benchmark/cache, lifecycle, warmups, cantidad de filas y latencia. Las filas de

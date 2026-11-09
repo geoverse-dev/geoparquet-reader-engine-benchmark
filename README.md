@@ -49,8 +49,8 @@ These URLs are recorded from the original experiments, **not revalidated here**.
 | `make check` | Check tools and local files | Console |
 | `make setup` | `uv sync`, clone/build Parquetry, build benchmark | Maven artifacts |
 | `make build` | Rebuild Java benchmark and upstream snapshot | `java/target/` |
-| `make smoke` | First BBOX, 0 warmups, all 3 readers and layouts | `results/smoke-*.csv` |
-| `make bench` | DuckDB/httpfs, cached Parquetry, and parquet-java/S3A defaults; 150 BBOX per layout | `results/r2-comparable-*.csv` |
+| `make smoke` | First BBOX, 0 warmups, all readers/configurations and layouts | `results/smoke-*.csv` |
+| `make bench` | DuckDB rows, DuckDB Arrow, cached Parquetry, and parquet-java; 150 BBOX per layout | `results/r2-comparable-*.csv` |
 | `make stress-500` | Explicit sustained-load suite; 500 BBOX executions per engine/layout | `results/stress/r2-stress-500-*.csv` |
 | `make stress-1000` | Explicit sustained-load suite; 1000 BBOX executions per engine/layout | `results/stress/r2-stress-1000-*.csv` |
 | `PARQUETRY_CACHE=off make bench` | Uncached Parquetry diagnostic | `results/r2-comparable-nocache-*.csv` |
@@ -101,7 +101,9 @@ With `WARMUPS=0`, the measured pass is labeled `first_access_session`, but this 
 
 `results/r2-comparable-runs.csv` records the reader configuration, benchmark/cache mode, lifecycle, warmup count, query rows and latency. Parquetry rows also record delegate range calls and bytes. parquet-java leaves those fields empty because Hadoop S3A does not expose equivalent per-query counters through parquet-java. The summary groups query names by size, reports median/mean/p95/p99, and validates every non-DuckDB reader against DuckDB per query.
 
-The headline result is a comparison of complete, conventional configurations—DuckDB/httpfs defaults, Parquetry with Tileverse cache, and parquet-java with Hadoop S3A defaults—not an isolated comparison of decoding engines or caches.
+DuckDB Arrow is an additional materialization configuration, not a fourth reader. It uses the same query, cache profile, projected columns, row-count validation, and canonical checksum as DuckDB `fetchall()`. `read_materialize_ms` records query execution plus Arrow export, `validation_ms` records canonical checksum consumption, and `elapsed_ms` includes both. The Arrow arm is included automatically in smoke, sequential, stress, geographic, memory, and concurrent runs.
+
+The headline result is a comparison of complete configurations—DuckDB/httpfs with Python rows, DuckDB/httpfs with Arrow, Parquetry with Tileverse cache, and parquet-java with Hadoop S3A defaults—not an isolated comparison of decoding engines or caches.
 
 **Important:** DuckDB and parquet-java use the same stored `bbox` comparisons. Parquetry uses `geometry.bboxIntersects`, so its result can differ by a few boundary features. parquet-java pushes the numeric BBOX predicate through `FilterCompat`, projects `id`, `geometry`, and `bbox`, and counts materialized records. I/O counters across the three native backends are not treated as equivalent.
 

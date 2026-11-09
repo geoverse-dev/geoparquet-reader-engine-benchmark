@@ -9,7 +9,7 @@ help:
 	@echo "  make test-contract-engines  Local bbox-v1 check across all readers"
 	@echo "  make validate           Validate IDs for all layouts and readers"
 	@echo "  make smoke              1 remote query per layout/reader"
-	@echo "  make bench              Compare all 3 readers (150 BBOX/layout)"
+	@echo "  make bench              Compare 3 readers + DuckDB Arrow (150 BBOX/layout)"
 	@echo "  make stress-500         Explicit 500-query sustained BBOX stress suite"
 	@echo "  make stress-1000        Explicit 1000-query sustained BBOX stress suite"
 	@echo "  PARQUETRY_CACHE=off make bench  Uncached Parquetry diagnostic"

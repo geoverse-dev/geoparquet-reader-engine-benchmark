@@ -16,6 +16,7 @@ import duckdb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from python.cache_profile import apply_duckdb_profile
+from python.arrow_materialization import materialized_arrow_hash
 from python.query_contract import materialized_multiset_hash
 
 parser = argparse.ArgumentParser()
@@ -39,6 +40,7 @@ parser.add_argument(
     "--operation", choices=["scan", "materialize"], default="materialize"
 )
 parser.add_argument("--profile", choices=["default", "tuned"], default="default")
+parser.add_argument("--materialization", choices=["rows", "arrow"], default="rows")
 
 args = parser.parse_args()
 
@@ -129,7 +131,11 @@ hot = min(6, len(windows))
 if args.scenario != "cold":
     for _ in range(args.warmup):
         for row in windows[:hot]:
-            con.execute(sql, params(row)).fetchall()
+            warmed = con.execute(sql, params(row))
+            if args.materialization == "arrow":
+                warmed.to_arrow_table()
+            else:
+                warmed.fetchall()
 
 
 # ------------------------------------------------------------
@@ -175,16 +181,27 @@ def query(index):
     result = local.cursor.execute(
         sql,
         params(row),
-    ).fetchall()
-
-    elapsed_ms = (time.perf_counter_ns() - start) / 1e6
-
-    checksum = (
-        materialized_multiset_hash(result)
-        if args.operation == "materialize"
-        else "not_applicable"
     )
-    return len(result), elapsed_ms, checksum
+    if args.materialization == "arrow":
+        materialized = result.to_arrow_table()
+        rows = materialized.num_rows
+    else:
+        materialized = result.fetchall()
+        rows = len(materialized)
+    read_ms = (time.perf_counter_ns() - start) / 1e6
+    validation_start = time.perf_counter_ns()
+    if args.operation == "materialize":
+        checksum = (
+            materialized_arrow_hash(materialized)
+            if args.materialization == "arrow"
+            else materialized_multiset_hash(materialized)
+        )
+    else:
+        checksum = "not_applicable"
+    validation_ms = (time.perf_counter_ns() - validation_start) / 1e6
+    total_ms = (time.perf_counter_ns() - start) / 1e6
+    elapsed_ms = total_ms if args.materialization == "arrow" else read_ms
+    return rows, elapsed_ms, checksum, read_ms, validation_ms
 
 
 start = time.perf_counter()
@@ -199,6 +216,8 @@ finally:
 wall = time.perf_counter() - start
 
 latencies = sorted(result[1] for result in results)
+read_latencies = sorted(result[3] for result in results)
+validation_latencies = sorted(result[4] for result in results)
 
 
 def percentile(value):
@@ -211,11 +230,11 @@ def percentile(value):
 
 print(
     "engine,scenario,operation,query_contract,concurrency,queries,wall_ms,qps,"
-    "p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows"
+    "p50_ms,p95_ms,p99_ms,peak_rss_mb,total_rows,read_materialize_p50_ms,validation_p50_ms"
 )
 
 print(
-    f"duckdb,"
+    f"{'duckdb-arrow' if args.materialization == 'arrow' else 'duckdb'},"
     f"{args.scenario},"
     f"{args.operation},bbox-v1,"
     f"{args.concurrency},"
@@ -226,7 +245,9 @@ print(
     f"{percentile(0.95):.3f},"
     f"{percentile(0.99):.3f},"
     f"{peak[0] / 1048576:.2f},"
-    f"{sum(result[0] for result in results)}"
+    f"{sum(result[0] for result in results)},"
+    f"{statistics.median(read_latencies):.3f},"
+    f"{statistics.median(validation_latencies):.3f}"
 )
 
 con.close()
