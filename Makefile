@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
-.PHONY: help check setup build test-contract-engines validate data optimize smoke bench report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report benchmark-suite all
+.PHONY: help check setup build test-contract-engines validate data optimize smoke bench stress stress-500 stress-1000 report cache io-diagnostics duckdb-cache geographic-jumps memory bench-concurrent bench-concurrent-warm bench-concurrent-mixed bench-concurrent-cold bench-concurrent-report benchmark-suite all
 help:
 	@echo "GeoParquet reader benchmark (DuckDB vs Parquetry vs parquet-java)"
 	@echo "  make check              Check requirements"
@@ -10,6 +10,8 @@ help:
 	@echo "  make validate           Validate IDs for all layouts and readers"
 	@echo "  make smoke              1 remote query per layout/reader"
 	@echo "  make bench              Compare all 3 readers (150 BBOX/layout)"
+	@echo "  make stress-500         Explicit 500-query sustained BBOX stress suite"
+	@echo "  make stress-1000        Explicit 1000-query sustained BBOX stress suite"
 	@echo "  PARQUETRY_CACHE=off make bench  Uncached Parquetry diagnostic"
 	@echo "  make report             Summarize existing benchmark CSV"
 	@echo "  make cache              Tileverse cache vs no-cache"
@@ -44,6 +46,12 @@ smoke:
 	@WARMUPS=0 LIMIT=1 OUT=results/smoke-runs.csv SUMMARY=results/smoke-summary.csv bash scripts/run-r2-comparable.sh
 bench:
 	@bash scripts/run-r2-comparable.sh
+stress:
+	@bash scripts/run-r2-stress.sh
+stress-500:
+	@STRESS_BBOX_COUNT=500 bash scripts/run-r2-stress.sh
+stress-1000:
+	@STRESS_BBOX_COUNT=1000 bash scripts/run-r2-stress.sh
 report:
 	@uv run --frozen python scripts/report-r2-comparable.py results/r2-comparable-runs.csv results/r2-comparable-summary.csv
 cache:

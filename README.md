@@ -51,6 +51,8 @@ These URLs are recorded from the original experiments, **not revalidated here**.
 | `make build` | Rebuild Java benchmark and upstream snapshot | `java/target/` |
 | `make smoke` | First BBOX, 0 warmups, all 3 readers and layouts | `results/smoke-*.csv` |
 | `make bench` | DuckDB/httpfs, cached Parquetry, and parquet-java/S3A defaults; 150 BBOX per layout | `results/r2-comparable-*.csv` |
+| `make stress-500` | Explicit sustained-load suite; 500 BBOX executions per engine/layout | `results/stress/r2-stress-500-*.csv` |
+| `make stress-1000` | Explicit sustained-load suite; 1000 BBOX executions per engine/layout | `results/stress/r2-stress-1000-*.csv` |
 | `PARQUETRY_CACHE=off make bench` | Uncached Parquetry diagnostic | `results/r2-comparable-nocache-*.csv` |
 | `make report` | Regenerate summary from benchmark runs | `results/r2-comparable-summary.csv` |
 | `make io-diagnostics` | First-query HTTP/filesystem vs logical range reads | Console |
@@ -76,6 +78,20 @@ WARMUPS=2 LIMIT=0 make bench
 ```
 
 `LIMIT=0` means all 150 rows. `WARMUPS` repeats the full workload before the measured pass. These tests use a **persistent reader process per engine/layout**; they are not cold-process CLI benchmarks. First-read diagnostics are separate.
+
+### Sustained BBOX stress suites
+
+The 500- and 1000-query suites are deliberately opt-in and are not dependencies
+of `benchmark-suite`, `all`, or the default target. They deterministically cycle
+and rotate the validated 150-query workload, preserving its BBOX coordinates and
+size distribution. They measure sustained execution and cache behavior; they do
+not claim 500 or 1000 geographically unique windows. Defaults are `WARMUPS=0` and
+`OPERATION=materialize`:
+
+```bash
+make stress-500
+make stress-1000
+```
 
 `PARQUETRY_CACHE=on` is the default for Parquetry. One Tileverse `CachingRangeReader` and one `ParquetSource` are reused per layout. parquet-java constructs a `ParquetReader` per filtered query over a persistent Hadoop S3A filesystem and leaves S3A buffering, readahead, and connection behavior at their native defaults. `PARQUETRY_CACHE=off` only changes Parquetry and writes separate diagnostic files. DuckDB keeps its existing `httpfs` defaults.
 

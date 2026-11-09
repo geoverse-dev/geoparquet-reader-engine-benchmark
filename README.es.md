@@ -85,6 +85,8 @@ original, ejecute `make data`, suba los objetos a un bucket S3 propio y configur
 | `make build` | Recompilar el benchmark Java y el snapshot upstream | `java/target/` |
 | `make smoke` | Primer BBOX, sin warmup, tres lectores y tres layouts | `results/smoke-*.csv` |
 | `make bench` | DuckDB, Parquetry y parquet-java, 150 BBOX por layout | `results/r2-comparable-*.csv` |
+| `make stress-500` | Suite explícita de carga sostenida; 500 ejecuciones BBOX por engine/layout | `results/stress/r2-stress-500-*.csv` |
+| `make stress-1000` | Suite explícita de carga sostenida; 1000 ejecuciones BBOX por engine/layout | `results/stress/r2-stress-1000-*.csv` |
 | `PARQUETRY_CACHE=off make bench` | Diagnóstico de Parquetry sin cache | `results/r2-comparable-nocache-*.csv` |
 | `make report` | Regenerar el resumen de la corrida principal | `results/r2-comparable-summary.csv` |
 | `make io-diagnostics` | I/O HTTP/filesystem vs. rangos lógicos en la primera consulta | Consola |
@@ -112,6 +114,20 @@ WARMUPS=2 LIMIT=0 make bench
 `LIMIT=0` usa las 150 filas. `WARMUPS` repite el workload completo antes de la
 pasada medida. Se mantiene un proceso y lector persistente por motor y layout; no
 son benchmarks que creen un proceso frío por consulta.
+
+### Suites de stress BBOX sostenido
+
+Las suites de 500 y 1000 consultas son opt-in: no forman parte de
+`benchmark-suite`, `all` ni del target por defecto. Recorren y rotan de manera
+determinística el workload validado de 150 consultas, conservando sus coordenadas
+BBOX y la distribución de tamaños. Miden ejecución sostenida y comportamiento de
+cache; no representan 500 o 1000 ventanas geográficas únicas. Por defecto usan
+`WARMUPS=0` y `OPERATION=materialize`:
+
+```bash
+make stress-500
+make stress-1000
+```
 
 `PARQUETRY_CACHE=on` es el valor predeterminado de Parquetry, que reutiliza un
 `CachingRangeReader` y un `ParquetSource` por layout. parquet-java crea un
